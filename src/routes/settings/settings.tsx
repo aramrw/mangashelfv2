@@ -63,30 +63,25 @@ export default function Settings() {
           </h1>
         </header>
         {errorMessage && <SettingsErrorCard message={errorMessage} />}
-        <Tabs
-          defaultValue="profile"
-          class="w-full"
-          orientation="vertical"
-          value={selectedTab()}
-          onChange={setSelectedTab}
-          disabled={errorMessage ? true : false}
-        >
-          <TabsList class="rounded-bl-lg w-40 min-w-20 h-fit">
-            <TabsTrigger value="profile">
-              Profile
-              <IconUserFilled class="w-3 h-auto p-0" />
-            </TabsTrigger>
-            <TabsTrigger value="mpv">
-              mpv
-              <IconMpv class="ml-0.5 w-3 stroke-[2.4px]" />
-            </TabsTrigger>
-            <TabsIndicator />
-          </TabsList>
-          <Show when={user.latest}>
-            <ProfileTabSection user={user.latest!} />
-            <MpvTabSection user={user.latest!} />
-          </Show>
-        </Tabs>
+        {/* <Tabs */}
+        {/*   defaultValue="profile" */}
+        {/*   class="w-full" */}
+        {/*   orientation="vertical" */}
+        {/*   value={selectedTab()} */}
+        {/*   onChange={setSelectedTab} */}
+        {/*   disabled={errorMessage ? true : false} */}
+        {/* > */}
+        {/*   <TabsList class="rounded-bl-lg w-40 min-w-20 h-fit"> */}
+        {/*     <TabsTrigger value="profile"> */}
+        {/*       Profile */}
+        {/*       <IconUserFilled class="w-3 h-auto p-0" /> */}
+        {/*     </TabsTrigger> */}
+        {/*     <TabsIndicator /> */}
+        {/*   </TabsList> */}
+        {/*   <Show when={user.latest}> */}
+        {/*     <ProfileTabSection user={user.latest!} /> */}
+        {/*   </Show> */}
+        {/* </Tabs> */}
       </main>
     </>
   );
