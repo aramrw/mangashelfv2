@@ -1,28 +1,16 @@
 import IconMpv from "../../../main-components/icons/icon-mpv";
 import { Button } from "../../../components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../../../components/ui/card";
-import {
-  TabsContent,
-} from "../../../components/ui/tabs";
-import {
-  TextField,
-  TextFieldLabel,
-  TextFieldRoot,
-} from "../../../components/ui/textfield";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../components/ui/card";
+import { TabsContent } from "../../../components/ui/tabs";
+import { TextField, TextFieldLabel, TextFieldRoot } from "../../../components/ui/textfield";
 import { Switch, SwitchControl, SwitchThumb } from "../../../components/ui/switch";
 import { IconFolderSearch } from "@tabler/icons-solidjs";
-import { Platform, platform } from '@tauri-apps/plugin-os';
+import { Platform, platform } from "@tauri-apps/plugin-os";
 import { open as openShell } from "@tauri-apps/plugin-shell";
 import { open } from "@tauri-apps/plugin-dialog";
 import { UserType } from "../../../models";
-import { appDataDir as getAppDataDir, join } from '@tauri-apps/api/path';
-import { Accessor, createEffect, createResource, createSignal, onCleanup, onMount, Setter, Show } from "solid-js";
+import { appDataDir as getAppDataDir, join } from "@tauri-apps/api/path";
+import { Accessor, createResource, createSignal, onCleanup, onMount, Setter, Show } from "solid-js";
 import {
   AlertDialog,
   AlertDialogClose,
@@ -32,18 +20,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-  AlertDialogAction
 } from "../../../components/ui/alert-dialog";
 import { invoke } from "@tauri-apps/api/core";
-import { emit, listen, UnlistenFn } from '@tauri-apps/api/event'
-import { cn } from "../../../libs/cn";
+import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import Spinner from "../../../main-components/icons/spinner";
 import update_user from "../../../tauri-cmds/update-user";
-import { exists } from "@tauri-apps/plugin-fs";
-
 
 export default function MpvTabSection({ user }: { user: UserType }) {
-
   console.log(user);
 
   const [appDataDir] = createResource<string>(getAppDataDir);
@@ -68,7 +51,6 @@ export default function MpvTabSection({ user }: { user: UserType }) {
     }
   });
 
-
   return (
     <TabsContent value="mpv">
       <Card>
@@ -84,27 +66,21 @@ export default function MpvTabSection({ user }: { user: UserType }) {
         </CardHeader>
         <CardContent class="w-fit">
           <div class="flex flex-row justify-center sm:justify-start items-center gap-x-4 flex-wrap">
-            <FilePickerTextField
-              platform={currentPlatform}
-              label={"Config"}
-              extensions={["config"]}
-              defaultPath={appDataDir.latest!}
-            />
+            <FilePickerTextField platform={currentPlatform} label={"Config"} extensions={["config"]} defaultPath={appDataDir.latest!} />
             <Show when={appDataDir.latest}>
               <TextFieldRoot class="">
                 <TextFieldLabel>Plugins</TextFieldLabel>
                 <div class="flex flex-row justify-center items-center">
-                  <TextField class="rounded-r-none z-10 ml-0"
-                    placeholder={user.settings.plugins_path
-                      ? user.settings.plugins_path
-                      : appDataDir.latest} />
-                  <Button variant="outline" class=" border border-l-0 rounded-none rounded-r-sm p-0"
+                  <TextField class="rounded-r-none z-10 ml-0" placeholder={user.settings.plugins_path ? user.settings.plugins_path : appDataDir.latest} />
+                  <Button
+                    variant="outline"
+                    class=" border border-l-0 rounded-none rounded-r-sm p-0"
                     onClick={async () => {
                       const dir = await open({
                         defaultPath: await join(appDataDir.latest!, "plugins"),
                         directory: true,
                         title: "Plugins",
-                      })
+                      });
                     }}
                   >
                     <IconFolderSearch class="p-[3.5px] stroke-[1.9px]" />
@@ -119,13 +95,9 @@ export default function MpvTabSection({ user }: { user: UserType }) {
             extensions={["exe"]}
             filterName={"mpv"}
             placeholder={user.settings.mpv_path}
-            defaultPath={user.settings.mpv_path
-              ? user.settings.mpv_path
-              : appDataDir.latest}
+            defaultPath={user.settings.mpv_path ? user.settings.mpv_path : appDataDir.latest}
           />
-          <Switch
-            checked={user.settings.autoplay}
-            class="w-fit shadow-sm my-3 flex flex-row justify-between items-center gap-2 rounded-sm p-2 border">
+          <Switch checked={user.settings.autoplay} class="w-fit shadow-sm my-3 flex flex-row justify-between items-center gap-2 rounded-sm p-2 border">
             <label class="font-medium text-xs">Autoplay</label>
             <SwitchControl>
               <SwitchThumb />
@@ -134,7 +106,7 @@ export default function MpvTabSection({ user }: { user: UserType }) {
         </CardContent>
       </Card>
     </TabsContent>
-  )
+  );
 }
 
 function FilePickerTextField({
@@ -145,37 +117,39 @@ function FilePickerTextField({
   filterName,
   placeholder,
 }: {
-  platform: Platform,
-  label: string,
-  extensions: string[],
-  defaultPath?: string,
-  filterName?: string,
-  placeholder?: string,
-}
-) {
+  platform: Platform;
+  label: string;
+  extensions: string[];
+  defaultPath?: string;
+  filterName?: string;
+  placeholder?: string;
+}) {
   return (
     <TextFieldRoot class="">
       <TextFieldLabel>{label}</TextFieldLabel>
       <div class="w-fit flex flex-row justify-center items-center">
         <TextField class="z-10 rounded-r-none" placeholder={placeholder} />
-        <Button variant="outline" class="border border-l-0 rounded-none rounded-r-sm p-0"
+        <Button
+          variant="outline"
+          class="border border-l-0 rounded-none rounded-r-sm p-0"
           onClick={async () => {
             const file = await open({
               defaultPath,
               title: label,
-              filters: [{
-                name: filterName ? filterName : "",
-                extensions,
-              }]
-            })
+              filters: [
+                {
+                  name: filterName ? filterName : "",
+                  extensions,
+                },
+              ],
+            });
           }}
         >
           <IconFolderSearch class="p-[3.5px] stroke-[1.9px]" />
         </Button>
       </div>
     </TextFieldRoot>
-  )
-
+  );
 }
 
 function DownloadMpvAlertDialog({
@@ -184,7 +158,7 @@ function DownloadMpvAlertDialog({
   downloadPercent,
   setDownloadPercent,
 }: {
-  user: UserType
+  user: UserType;
   platform: Platform;
   downloadPercent: Accessor<number>;
   setDownloadPercent: Setter<number>;
@@ -199,8 +173,8 @@ function DownloadMpvAlertDialog({
       ...user,
       settings: {
         ...user.settings,
-        mpv_path: downloadPath as string
-      }
+        mpv_path: downloadPath as string,
+      },
     };
 
     await update_user(newUser);
@@ -224,22 +198,30 @@ function DownloadMpvAlertDialog({
               </Show>
             </AlertDialogTitle>
             <AlertDialogDescription>
-              <Show when={!downloadPercent() && downloadPercent() === 0} fallback={
-                <>
-                  <span>Downloading to your system's appdata folder, please wait...</span>
-                  <br />
-                  <span class="px-1 text-lg mt-1 rounded-sm bg-muted" >
-                    {downloadPercent()} %
-                  </span>
-                </>
-              }>
+              <Show
+                when={!downloadPercent() && downloadPercent() === 0}
+                fallback={
+                  <>
+                    <span>Downloading to your system's appdata folder, please wait...</span>
+                    <br />
+                    <span class="px-1 text-lg mt-1 rounded-sm bg-muted">{downloadPercent()} %</span>
+                  </>
+                }
+              >
                 mpv shelf can download, install, & manage mpv for you.
                 <br />
                 <span class="text-primary">How would you like to continue?</span>
               </Show>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <Show when={downloadPercent() === 0} fallback={<div class="w-full flex justify-end"><Spinner /></div>}>
+          <Show
+            when={downloadPercent() === 0}
+            fallback={
+              <div class="w-full flex justify-end">
+                <Spinner />
+              </div>
+            }
+          >
             <AlertDialogFooter>
               <AlertDialogClose
                 onClick={() => {
@@ -249,13 +231,11 @@ function DownloadMpvAlertDialog({
               >
                 Manual
               </AlertDialogClose>
-              <Button onClick={handleDownload}>
-                Automatic
-              </Button>
+              <Button onClick={handleDownload}>Automatic</Button>
             </AlertDialogFooter>
           </Show>
         </AlertDialogContent>
-      </AlertDialog >
+      </AlertDialog>
     </>
   );
 }

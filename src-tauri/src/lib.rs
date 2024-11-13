@@ -10,10 +10,11 @@ mod misc;
 mod tray;
 
 use crate::database::{
-    delete_os_folders, get_default_user, get_os_folders_by_path, get_os_folder_by_path, get_os_folders, 
-    get_user_by_id, update_os_folders, update_user, get_panels,
+    delete_os_folders, get_default_user, get_next_folder, get_os_folder_by_path, get_os_folders,
+    get_os_folders_by_path, get_panels, get_prev_folder, get_user_by_id, update_os_folders,
+    update_user,
 };
-use crate::fs::{check_cover_img_exists, read_os_folder_dir, show_in_folder, download_mpv_binary};
+use crate::fs::{check_cover_img_exists, download_mpv_binary, read_os_folder_dir, show_in_folder};
 use crate::tray::init_tray;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -36,6 +37,8 @@ pub fn run() {
             get_os_folders,
             get_os_folder_by_path,
             get_os_folders_by_path,
+            get_prev_folder,
+            get_next_folder,
             update_os_folders,
             delete_os_folders,
             read_os_folder_dir,

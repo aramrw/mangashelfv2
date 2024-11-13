@@ -281,13 +281,38 @@ pub fn delete_os_folders(
     let db_path = handle.state::<PathBuf>().to_string_lossy().to_string();
     let db = Builder::new().open(&DBMODELS, db_path)?;
 
-    let rtx = db.rw_transaction()?;
+    let rwtx = db.rw_transaction()?;
 
     for folder in os_folders {
-        rtx.remove(folder)?;
+        // Retrieve all direct child folders
+        let child_folders: Vec<OsFolder> = rwtx
+            .scan()
+            .secondary(OsFolderKey::parent_path)?
+            .start_with(Some(folder.path.as_str()))?
+            .try_collect()?;
+
+        // Collect all panels for the current folder and its child folders
+        let panels: Vec<MangaPanel> = rwtx
+            .scan()
+            .secondary(MangaPanelKey::parent_path)?
+            .start_with(folder.path.as_str())?
+            .try_collect()?;
+
+        // Delete all panels within the folder and its child folders
+        for panel in panels {
+            rwtx.remove(panel)?;
+        }
+
+        // Delete all child folders
+        for f in child_folders {
+            rwtx.remove(f)?;
+        }
+
+        // Finally, delete the folder itself
+        rwtx.remove(folder)?;
     }
 
-    rtx.commit()?;
+    rwtx.commit()?;
 
     Ok(())
 }
@@ -324,4 +349,107 @@ pub fn update_user(user: User, handle: AppHandle) -> Result<(), DatabaseError> {
     rtx.commit()?;
 
     Ok(())
+}
+
+#[command]
+pub fn get_prev_folder(
+    handle: AppHandle,
+    parent_path: String,
+    current_folder: OsFolder,
+) -> Result<OsFolder, DatabaseError> {
+    let db_path = handle.state::<PathBuf>().to_string_lossy().to_string();
+    let db = Builder::new().open(&DBMODELS, db_path)?;
+
+    let rtx = db.r_transaction()?;
+    let mut folders: Vec<OsFolder> = rtx
+        .scan()
+        .secondary(OsFolderKey::parent_path)?
+        .start_with(Some(parent_path.as_str()))?
+        .try_collect()?;
+
+    if folders.is_empty() {
+        return Err(DatabaseError::OsFoldersNotFound(format!(
+            "0 child folders found in dir: {parent_path}",
+        )));
+    }
+
+    folders.sort_by(|a, b| {
+        // Extract the episode number from the title using regex
+        let num_a = EPISODE_TITLE_REGEX
+            .captures(&a.title)
+            .and_then(|caps| caps.get(1)) // Assuming the first capturing group contains the episode number
+            .and_then(|m| m.as_str().parse::<u32>().ok())
+            .unwrap_or(0);
+
+        let num_b = EPISODE_TITLE_REGEX
+            .captures(&b.title)
+            .and_then(|caps| caps.get(1))
+            .and_then(|m| m.as_str().parse::<u32>().ok())
+            .unwrap_or(0);
+
+        num_a.cmp(&num_b)
+    });
+
+    match folders
+        .into_iter()
+        .rev()
+        .skip_while(|folder| folder.path != current_folder.path)
+        .nth(1)
+    {
+        Some(pf) => Ok(pf),
+        None => Err(DatabaseError::OsFoldersNotFound(format!(
+            "could not get first child folder from parent: {parent_path}",
+        ))),
+    }
+}
+
+#[command]
+pub fn get_next_folder(
+    handle: AppHandle,
+    parent_path: String,
+    current_folder: OsFolder,
+) -> Result<OsFolder, DatabaseError> {
+    let db_path = handle.state::<PathBuf>().to_string_lossy().to_string();
+    let db = Builder::new().open(&DBMODELS, db_path)?;
+
+    let rtx = db.r_transaction()?;
+    let mut folders: Vec<OsFolder> = rtx
+        .scan()
+        .secondary(OsFolderKey::parent_path)?
+        .start_with(Some(parent_path.as_str()))?
+        .try_collect()?;
+
+    if folders.is_empty() {
+        return Err(DatabaseError::OsFoldersNotFound(format!(
+            "0 child folders found in dir: {parent_path}",
+        )));
+    }
+
+    folders.sort_by(|a, b| {
+        // Extract the episode number from the title using regex
+        let num_a = EPISODE_TITLE_REGEX
+            .captures(&a.title)
+            .and_then(|caps| caps.get(1)) // Assuming the first capturing group contains the episode number
+            .and_then(|m| m.as_str().parse::<u32>().ok())
+            .unwrap_or(0);
+
+        let num_b = EPISODE_TITLE_REGEX
+            .captures(&b.title)
+            .and_then(|caps| caps.get(1))
+            .and_then(|m| m.as_str().parse::<u32>().ok())
+            .unwrap_or(0);
+
+        num_a.cmp(&num_b)
+    });
+
+    match folders
+        .into_iter()
+        .skip_while(|folder| folder.path != current_folder.path)
+        .nth(1)
+    {
+        Some(nf) => Ok(nf),
+        None => Err(DatabaseError::OsFoldersNotFound(format!(
+            "could not get first child folder from parent: {parent_path}",
+        ))),
+    }
 }

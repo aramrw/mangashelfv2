@@ -87,3 +87,7 @@
 .slide-fade-enter {
   transform: translateX(-10px);
 }
+
+img {
+  image-rendering: auto;  /* or 'crisp-edges' for better scaling */
+}

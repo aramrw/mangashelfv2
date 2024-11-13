@@ -24,17 +24,17 @@ const LibraryFolderCard = ({
     <Transition
       appear={true}
       onEnter={(el, done) => {
-        const a = el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 1000 });
+        const a = el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 800 });
         a.finished.then(done);
       }}
       onExit={(el, done) => {
-        const a = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 1000 });
+        const a = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 800 });
         a.finished.then(done);
       }}
     >
       <ContextMenu>
-        <ContextMenuTrigger class="w-fit">
-          <div class="w-44 h-52 min-h-30 cursor-pointer relative border-[1.5px] 
+        <ContextMenuTrigger class="w-full flex justify-center items-center">
+          <div class="w-full h-52 min-h-30 cursor-pointer relative border-[1.5px] 
 						border-transparent rounded-sm shadow-black/20 shadow-md flex items-center 
 						justify-center overflow-hidden will-change-transform transition-all group"
             onClick={onClick}
@@ -70,18 +70,22 @@ const LibraryFolderCard = ({
 												 mix-blend-difference w-fit z-10 shadow-2xl rounded-none px-0.5">
                 {folder.title}
               </p>
-              <p class="text-[12px] font-medium absolute left-2 bottom-2 text text-zinc-300 bg-transparent 
+              <p class="text-[13px] font-medium absolute left-2 top-7 text text-zinc-300 bg-transparent 
+												 mix-blend-difference w-fit z-10 shadow-2xl rounded-none px-0.5">
+                {folder.last_read_panel?.title}
+              </p>
+              <p class="text-[12px] font-medium absolute right-2 bottom-2 text text-zinc-300 bg-transparent 
 												mix-blend-difference w-fit z-10 shadow-2xl rounded-none px-0.5">
                 {folder.update_date}
               </p>
-              <p class="text-[13px] font-medium absolute left-2 bottom-6 text text-zinc-300 bg-transparent 
+              <p class="text-[13px] font-medium absolute right-2 bottom-6 text text-zinc-300 bg-transparent 
 												mix-blend-difference w-fit z-10 shadow-2xl rounded-none px-0.5">
                 {folder.update_time}
               </p>
             </div>
 
             {/* folder.Title at Bottom */}
-            <div class="h-fit absolute left-0 bottom-0 bg-primary/80 
+            <div class="h-fit absolute left-0 bottom-0 bg-primary/80 font-medium 
 												border-t-2 border-t-secondary/10 shadow-md 
                         text-border text-xs p-1 mix-blend-plus-darker 
 												group-hover:opacity-0 transition-opacity duration-300"

@@ -27,8 +27,8 @@ export default function LibraryFoldersSection({
         class="md:px-4 overflow-hidden w-full h-fit px-2 pb-4 relative 
 				border-b-white border-b-2 shadow-lg shadow-primary/10">
         <ul
-          class="h-fit w-fit grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 
-					xl:grid-cols-4 gap-3 justify-start items-start">
+          class="mx-auto h-fit w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 
+					xl:grid-cols-4 gap-3 lg:px-32 place-items-center">
           <For each={childFolders}>
             {(folder, index) => (
               <LibraryFolderCard
