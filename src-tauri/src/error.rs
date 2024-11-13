@@ -46,11 +46,11 @@ pub enum MpvError {
 #[derive(thiserror::Error, Debug)]
 pub enum HttpClientError {
     #[error("{0}")]
-    RequestError(#[from] reqwest::Error),
+    Request(#[from] reqwest::Error),
     #[error("{0:#?}")]
-    TuariError(#[from] tauri::Error),
+    Tuari(#[from] tauri::Error),
     #[error("{0:#?}")]
-    IoError(#[from] io::Error),
+    Io(#[from] io::Error),
 }
 
 impl From<HttpClientError> for InvokeError {
