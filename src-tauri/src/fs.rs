@@ -1,15 +1,14 @@
 use std::path::{Path, PathBuf};
 //use std::time::Instant;
-use futures_util::{StreamExt, TryStreamExt};
+use futures_util::TryStreamExt;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use std::{env, fs, io};
+use std::{env, io};
 use std::{fs::read_dir, process::Command};
 use tokio::io::AsyncWriteExt;
 
 use crate::database::data::v1::MangaPanel;
 use crate::database::update_panels;
 use crate::database::EPISODE_TITLE_REGEX;
-use crate::error::MpvError;
 use crate::misc::get_date_time;
 use crate::{
     database::{data::v1::OsFolder, update_os_folders},
@@ -81,7 +80,7 @@ pub fn read_os_folder_dir(
     let update_date = update_datetime.clone().unwrap().0;
     let update_time = update_datetime.clone().unwrap().1;
 
-    let panels: Vec<MangaPanel> = panel_paths
+    let mut panels: Vec<MangaPanel> = panel_paths
         .into_par_iter()
         .filter_map(|vid_path| {
             create_manga_panel(
@@ -108,6 +107,23 @@ pub fn read_os_folder_dir(
             .ok()
         })
         .collect();
+
+    panels.sort_by(|a, b| {
+        // Extract the episode number from the title using regex
+        let num_a = EPISODE_TITLE_REGEX
+            .captures(&a.title)
+            .and_then(|caps| caps.get(1)) // Assuming the first capturing group contains the episode number
+            .and_then(|m| m.as_str().parse::<u32>().ok())
+            .unwrap_or(0);
+
+        let num_b = EPISODE_TITLE_REGEX
+            .captures(&b.title)
+            .and_then(|caps| caps.get(1))
+            .and_then(|m| m.as_str().parse::<u32>().ok())
+            .unwrap_or(0);
+
+        num_a.cmp(&num_b)
+    });
 
     let first_panel = panels.first().cloned();
     let mut cover_img = None;
@@ -182,30 +198,7 @@ pub fn check_cover_img_exists(img_path: &str) -> bool {
     false
 }
 
-fn join_cover_img_path(
-    path: impl AsRef<str>,
-    app_data_dir: &Path,
-) -> Result<String, DatabaseError> {
-    let title = Path::new(path.as_ref()).file_stem().ok_or_else(|| {
-        DatabaseError::IoError(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!(
-                "'{}' contained invalid characters when trying to join cover img path.",
-                path.as_ref()
-            ),
-        ))
-    })?;
-    // Construct the path for the entry frame without the original video extension
-    let cover_img_full_path = app_data_dir
-        .join("frames")
-        .join(title) // This is the stem without the original extension
-        .with_extension("jpg")
-        .to_string_lossy()
-        .to_string();
-    Ok(cover_img_full_path)
-}
-
-fn call_ffmpeg_sidecar(
+fn _call_ffmpeg_sidecar(
     handle: &AppHandle,
     entry_path: impl AsRef<str>,
     entry_frame_full_path: &Path,
@@ -226,7 +219,7 @@ fn call_ffmpeg_sidecar(
     Ok(())
 }
 
-pub fn normalize_path(path: &str) -> PathBuf {
+pub fn _normalize_path(path: &str) -> PathBuf {
     let normalized = path
         .replace("/", std::path::MAIN_SEPARATOR_STR)
         .replace("\\", std::path::MAIN_SEPARATOR_STR);
@@ -275,10 +268,14 @@ pub async fn download_mpv_binary(handle: AppHandle) -> Result<String, HttpClient
 pub fn show_in_folder(path: String) {
     #[cfg(target_os = "windows")]
     {
-        Command::new("explorer")
+        let mut child = Command::new("explorer")
             .args(["/select,", &path]) // The comma after select is not a typo
             .spawn()
             .unwrap();
+
+        child
+            .wait()
+            .expect("failed to wait for windows file explorer to end");
     }
 
     // #[cfg(target_os = "linux")]
@@ -315,6 +312,9 @@ pub fn show_in_folder(path: String) {
 
     #[cfg(target_os = "macos")]
     {
-        Command::new("open").args(["-R", &path]).spawn().unwrap();
+        let mut child = Command::new("open").args(["-R", &path]).spawn().unwrap();
+        child
+            .wait()
+            .expect("failed to wait for macos finder to end");
     }
 }
