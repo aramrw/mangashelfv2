@@ -21,8 +21,8 @@ export default function FolderCardContextMenuContent({
   currentPlatform
 }: {
   folder: OsFolder;
-  user: Accessor<UserType | null>;
-  refetch: (info?: unknown) => OsFolder[] | Promise<OsFolder[] | undefined> | null | undefined;
+  user: Accessor<UserType | null> | undefined;
+  refetch?: (info?: unknown) => OsFolder[] | Promise<OsFolder[] | undefined> | null | undefined;
   currentPlatform: Platform;
 }) {
   return (
@@ -42,22 +42,26 @@ export default function FolderCardContextMenuContent({
           </div>
         </Show>
       </ContextMenuItem>
-      <ContextMenuSeparator />
-      <ContextMenuSub>
-        <ContextMenuSubTrigger inset>Edit</ContextMenuSubTrigger>
-        <ContextMenuSubContent class="w-fit ml-2">
-          <ContextMenuItem class="flex flex-row items-center gap-0.5"
-            onClick={() => {
-              delete_os_folders([folder], user()!.id).then(() => {
-                refetch();
-              });
-            }}
-          >
-            Remove
-            <IconBackspace class="h-auto w-4" />
-          </ContextMenuItem>
-        </ContextMenuSubContent>
-      </ContextMenuSub>
+      <Show when={user && user()}>
+        <ContextMenuSeparator />
+        <ContextMenuSub>
+          <ContextMenuSubTrigger inset>Edit</ContextMenuSubTrigger>
+          <ContextMenuSubContent class="w-fit ml-2">
+            <ContextMenuItem class="flex flex-row items-center gap-0.5"
+              onClick={() => {
+                if (user && refetch) {
+                  delete_os_folders([folder], user()!.id!).then(() => {
+                    refetch();
+                  });
+                }
+              }}
+            >
+              Remove
+              <IconBackspace class="h-auto w-4" />
+            </ContextMenuItem>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+      </Show>
     </ContextMenuContent>
   )
 }
