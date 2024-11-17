@@ -1,7 +1,7 @@
 import { useParams } from "@solidjs/router";
 import { Transition } from "solid-transition-group";
 import LibraryHeader from "./header";
-import { createResource, Show } from "solid-js";
+import { createEffect, createResource, createSignal, Show } from "solid-js";
 import NavBar from "../../main-components/navbar";
 import get_user_by_id from "../../tauri-cmds/get_user_by_id";
 import get_os_folder_by_path from "../../tauri-cmds/mpv/get_os_folder_by_path";
@@ -9,15 +9,37 @@ import { Tabs, TabsContent, TabsIndicator, TabsList, TabsTrigger } from "../../c
 import { IconFolderFilled } from "@tabler/icons-solidjs";
 import LibraryFoldersSection from "./folders-section";
 import get_os_folders_by_path from "../../tauri-cmds/get_os_folders_by_path";
+import upsert_read_os_dir from "../../tauri-cmds/handle_stale_folder";
 
 export default function Library() {
   const params = useParams();
-  const folderPath = () => decodeURIComponent(params.folder).replace(/\)$/, "");
+  const [folderPath, setFolderPath] = createSignal(decodeURIComponent(params.folder).replace(/\)$/, ""));
 
-  const [mainParentFolder] = createResource(folderPath, get_os_folder_by_path);
-
+  const [mainParentFolder, { refetch: refetchMainParentFolder }] = createResource(
+    () => folderPath(),
+    get_os_folder_by_path
+  );
   const [user] = createResource(() => (mainParentFolder() ? mainParentFolder()?.user_id : null), get_user_by_id);
-  const [childFolders] = createResource(() => (mainParentFolder() ? mainParentFolder()?.path : null), get_os_folders_by_path);
+  const [childFolders, { refetch: refetchChildFolders }] = createResource(() => (mainParentFolder() ? mainParentFolder()?.path : null), get_os_folders_by_path);
+
+  const [hasInitialized, setHasInitialized] = createSignal(false);
+
+  createEffect(async () => {
+    if (
+      !hasInitialized()
+      && folderPath()
+      && mainParentFolder()
+      && user()
+      && childFolders()
+    ) {
+      const is_refetch = await upsert_read_os_dir(mainParentFolder()?.path!, user()?.id!, childFolders()!, undefined);
+      console.log(is_refetch);
+      if (is_refetch) {
+        await refetchChildFolders();
+        setHasInitialized(true);
+      }
+    }
+  });
 
   return (
     <main class="w-full h-[100vh] relative overflow-auto" style={{ "scrollbar-gutter": "stable" }}>
@@ -34,7 +56,7 @@ export default function Library() {
         }}
       >
         <Tabs defaultValue="volumes" class="w-full" orientation="horizontal">
-          <Show when={mainParentFolder() && user()}>
+          <Show when={mainParentFolder.state === "ready" && user.state === "ready"}>
             <Transition
               appear={true}
               onEnter={(el, done) => {
@@ -46,7 +68,7 @@ export default function Library() {
                 a.finished.then(done);
               }}
             >
-              <LibraryHeader mainParentFolder={mainParentFolder()!} user={user()!} />
+              <LibraryHeader mainParentFolder={mainParentFolder} user={user} />
             </Transition>
             <TabsList class="w-full h-9 border">
               <Show when={childFolders()}>
@@ -59,7 +81,7 @@ export default function Library() {
             </TabsList>
             <Show when={childFolders()}>
               <TabsContent value="volumes">
-                <LibraryFoldersSection user={user()!} mainParentFolder={mainParentFolder()!} childFolders={childFolders()!} />
+                <LibraryFoldersSection user={user} mainParentFolder={mainParentFolder} childFolders={childFolders} />
               </TabsContent>
             </Show>
           </Show>
