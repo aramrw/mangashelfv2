@@ -1,11 +1,22 @@
-use std::{fs::create_dir, path::PathBuf, sync::LazyLock};
+use std::{
+    fs::create_dir,
+    io,
+    path::{Path, PathBuf},
+    sync::LazyLock,
+    time::SystemTime,
+};
 
 use data::v1::{MangaPanel, MangaPanelKey, OsFolder, OsFolderKey, User};
 use native_db::*;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use tauri::{command, AppHandle, Manager};
 
-use crate::{error::DatabaseError, misc::get_date_time};
+use crate::{
+    error::{DatabaseError, ReadDirError},
+    fs::HasPath,
+    misc::get_date_time,
+};
 
 pub static EPISODE_TITLE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     regex::Regex::new(
@@ -14,12 +25,45 @@ pub static EPISODE_TITLE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     .unwrap()
 });
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct FileMetadata {
+    pub created: Option<SystemTime>,
+    pub modified: Option<SystemTime>,
+    pub accessed: Option<SystemTime>,
+    pub size: Option<u64>,
+}
+
+impl FileMetadata {
+    // Constructor to get metadata of a file
+    pub fn from_path(path: &str) -> Option<Self> {
+        let metadata = std::fs::metadata(path).ok();
+
+        if let Some(metadata) = metadata {
+            let modified = metadata.modified().ok();
+            let created = metadata.created().ok();
+            let accessed = metadata.accessed().ok();
+            let size = Some(metadata.len());
+
+            return Some(Self {
+                modified,
+                created,
+                accessed,
+                size,
+            });
+        }
+
+        None
+    }
+}
+
 pub mod data {
     use native_db::{native_db, ToKey};
     use native_model::{native_model, Model};
     use serde::{Deserialize, Serialize};
 
     pub mod v1 {
+        use crate::database::FileMetadata;
+
         use super::*;
 
         #[derive(Serialize, Deserialize, Debug)]
@@ -77,6 +121,9 @@ pub mod data {
             pub title: String,
             #[secondary_key]
             pub parent_path: String,
+            pub metadata: Option<FileMetadata>,
+            // pub height: u32,
+            // pub width: u32,
             pub is_read: bool,
             pub update_date: String,
             pub update_time: String,
@@ -91,6 +138,78 @@ static DBMODELS: LazyLock<Models> = LazyLock::new(|| {
     models.define::<data::v1::MangaPanel>().unwrap();
     models
 });
+
+impl HasPath for OsFolder {
+    fn path(&self) -> &str {
+        self.path.as_ref()
+    }
+}
+
+impl HasPath for MangaPanel {
+    fn path(&self) -> &str {
+        self.path.as_ref()
+    }
+}
+
+impl MangaPanel {
+    pub fn new(
+        user_id: String,
+        parent_path: String,
+        path: String,
+        update_date: String,
+        update_time: String,
+    ) -> Result<MangaPanel, ReadDirError> {
+        let title = Path::new(&path)
+            .file_name()
+            .ok_or_else(|| {
+                ReadDirError::IoError(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!("'{path}' contained invalid characters when trying to get the OsVideo title."),
+                ))
+            })?
+            .to_string_lossy()
+            .to_string();
+
+        let metadata = FileMetadata::from_path(&path);
+
+        // Create MangaPanel instance
+        let vid = MangaPanel {
+            user_id,
+            parent_path,
+            path,
+            title,
+            metadata,
+            is_read: false,
+            update_date,
+            update_time,
+        };
+
+        Ok(vid)
+    }
+
+    pub fn is_stale_metadata(&self) -> bool {
+        if let Some(ref current_metadata) = self.metadata {
+            // Fetch the current metadata of the file
+            match FileMetadata::from_path(&self.path) {
+                Some(new_metadata) => {
+                    // Compare the modified time and size
+                    current_metadata.modified != new_metadata.modified
+                        || current_metadata.size != new_metadata.size
+                }
+                None => true, // If metadata can't be fetched, assume it's stale
+            }
+        } else {
+            true // If no metadata is stored, consider it stale
+        }
+    }
+
+    // Update the manga panel's metadata
+    pub fn update_metadata(&mut self) {
+        if let Some(new_metadata) = FileMetadata::from_path(&self.path) {
+            self.metadata = Some(new_metadata);
+        }
+    }
+}
 
 pub fn init_database(app_data_dir: &PathBuf, handle: &AppHandle) -> Result<(), db_type::Error> {
     if !app_data_dir.exists() {
@@ -121,8 +240,6 @@ pub fn get_os_folders(handle: AppHandle, user_id: String) -> Result<Vec<OsFolder
         .try_collect()?;
 
     folders.retain(|folder| folder.parent_path.is_none());
-
-    //println!("folders = {:#?}", folders);
 
     if folders.is_empty() {
         return Err(DatabaseError::OsFoldersNotFound(format!(
@@ -271,6 +388,20 @@ pub fn get_panels(
     //println!("{:#?}", folders);
 
     Ok(panels)
+}
+
+pub fn delete_panels(handle: &AppHandle, panels: Vec<MangaPanel>) -> Result<(), DatabaseError> {
+    let db_path = handle.state::<PathBuf>().to_string_lossy().to_string();
+    let db = Builder::new().open(&DBMODELS, db_path)?;
+    let rwtx = db.rw_transaction()?;
+
+    for p in panels {
+        rwtx.remove(p)?;
+    }
+
+    rwtx.commit()?;
+
+    Ok(())
 }
 
 #[command]
