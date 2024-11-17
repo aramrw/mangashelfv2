@@ -1,12 +1,13 @@
 import { OsFolder, } from "../../models";
-import { Accessor, createEffect, Show } from "solid-js";
+import { Accessor, Resource, Show } from "solid-js";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import {
   ContextMenu,
   ContextMenuTrigger,
 } from "../../components/ui/context-menu";
 import { Transition } from "solid-transition-group";
-import { IconFolderFilled } from "@tabler/icons-solidjs";
+import FolderCardContextMenuContent from "../../dashboard/components/folder-card-cm-context";
+import { platform } from "@tauri-apps/plugin-os";
 
 const LibraryFolderCard = ({
   index,
@@ -16,9 +17,11 @@ const LibraryFolderCard = ({
 }: {
   index: Accessor<number>;
   folder: OsFolder;
-  mainParentFolder: OsFolder;
+  mainParentFolder: Resource<OsFolder | null>;
   onClick: (event: MouseEvent) => void;
 }) => {
+
+  const currentPlatform = platform();
 
   return (
     <Transition
@@ -86,7 +89,7 @@ const LibraryFolderCard = ({
 
             {/* folder.Title at Bottom */}
             <div class="h-fit absolute left-0 bottom-0 bg-primary/80 font-medium 
-												border-t-2 border-t-secondary/10 shadow-md 
+												border-t-4 border-t-secondary/10 shadow-md rounded-tr-sm 
                         text-border text-xs p-1 mix-blend-plus-darker 
 												group-hover:opacity-0 transition-opacity duration-300"
             >
@@ -95,6 +98,7 @@ const LibraryFolderCard = ({
 
           </div>
         </ContextMenuTrigger>
+        <FolderCardContextMenuContent user={undefined} folder={folder} currentPlatform={currentPlatform} />
       </ContextMenu>
     </Transition >
   );
