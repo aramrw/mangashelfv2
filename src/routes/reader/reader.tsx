@@ -9,17 +9,36 @@ import { IconChevronLeft, IconChevronRight } from "@tabler/icons-solidjs";
 import { update_os_folders } from "../../tauri-cmds/os_folders";
 import { OsFolder } from "../../models";
 import { Transition } from "solid-transition-group";
+import { cn } from "../../libs/cn";
+import upsert_read_os_dir from "../../tauri-cmds/handle_stale_folder";
 
 export default function MangaReader() {
   const params = useParams();
   const [folderPath, setFolderPath] = createSignal(decodeURIComponent(params.folder).replace(/\)$/, ""));
-  const [currentMangaFolder, { mutate: setCurrentMangaFolder, refetch: refetchCurrentMangaFolder }] = createResource(folderPath, get_os_folder_by_path);
+  const [currentMangaFolder, { mutate: setCurrentMangaFolder }] = createResource(folderPath, get_os_folder_by_path);
   const [parentFolder] = createResource(() => (currentMangaFolder() ? currentMangaFolder()?.parent_path : null), get_os_folder_by_path);
   const [user] = createResource(() => (currentMangaFolder() ? currentMangaFolder()?.user_id : null), get_user_by_id);
 
-  const [panels] = createResource(() => (currentMangaFolder() ? currentMangaFolder()?.path : null), get_panels);
+  const [panels, { refetch: refetchPanels }] = createResource(() => (currentMangaFolder() ? currentMangaFolder()?.path : null), get_panels);
   const [panelIndex, setPanelIndex] = createSignal<number>(0);
   const [isDoublePanels, setIsDoublePanels] = createSignal<boolean>(false);
+  const [hasInitialized, setHasInitialized] = createSignal(false);
+
+  createEffect(async () => {
+    if (
+      !hasInitialized()
+      && folderPath()
+      && currentMangaFolder()
+      && user()
+      && panels()
+    ) {
+      const is_refetch = await upsert_read_os_dir(currentMangaFolder()?.path!, user()?.id!, undefined, panels()!);
+      if (is_refetch) {
+        console.log("the panels are stale, refetching...");
+        await refetchPanels();
+      }
+    }
+  });
 
   const CURRENT_PANELS = () => ({
     // For right-to-left reading, the "first" (right) panel is the current index
@@ -40,14 +59,10 @@ export default function MangaReader() {
     second: isDoublePanels() ? panels()?.[panelIndex() - 1] : null,
   });
 
-  const [zoom, setZoom] = createSignal<number>(0);
-
-  const [hasInitialized, setHasInitialized] = createSignal(false);
 
   createEffect(() => {
     if (currentMangaFolder.state === "ready" && panels.state === "ready" && !hasInitialized()) {
       // Set zoom and double panels from the current folder
-      setZoom(currentMangaFolder()?.zoom!);
       setIsDoublePanels(currentMangaFolder()?.is_double_panels!);
 
       // Find the panel index based on last read panel path
@@ -169,7 +184,7 @@ export default function MangaReader() {
   };
 
   return (
-    <main class="overflow-hidden relative h-[100dvh]">
+    <main class="overflow-hidden relative h-[100dvh]" >
       <ReaderNavbar
         user={user}
         folder={currentMangaFolder}
@@ -177,8 +192,6 @@ export default function MangaReader() {
         panels={panels}
         panelIndex={panelIndex}
         isDoublePanels={isDoublePanels}
-        currentZoomLevel={zoom}
-        setZoom={setZoom}
         setPanelIndex={setPanelIndex}
         setCurrentMangaFolder={setCurrentMangaFolder}
         handleSetDoublePanels={handleSetDoublePanels}
@@ -204,8 +217,8 @@ export default function MangaReader() {
           <Show when={panels.state === "ready" && user.state === "ready"}>
             <div class="h-full w-full flex justify-center items-center pb-8">
               <div
-                class="h-[96.6%] lg:px-4 xl:px-10 w-auto z-20 absolute left-0 flex items-center cursor-pointer
-							justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-80"
+                class="h-[96.6%] w-1/4 z-20 absolute left-0 flex items-center cursor-pointer
+							justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30"
                 onClick={async () => {
                   if (isDoublePanels()) {
                     await handleNextPanel();
@@ -217,8 +230,8 @@ export default function MangaReader() {
                 <IconChevronLeft class="h-20 md:h-28 w-auto bg-primary/10 pr-1 text-primary/50 " />
               </div>
               <div
-                class="h-[96.6%] lg:px-4 xl:px-10 w-auto z-20 absolute right-0 flex items-center cursor-pointer
-							justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-80"
+                class="h-[96.6%] w-1/4 z-20 absolute right-0 flex items-center cursor-pointer
+							justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30"
                 onClick={async () => {
                   if (isDoublePanels()) {
                     await handlePrevPanel();
@@ -243,7 +256,8 @@ export default function MangaReader() {
                 {currentMangaFolder()?.title}
               </h2>
 
-              <div class="relative flex flex-row justify-center items-center">
+              <div class="relative flex flex-row justify-center items-center"
+              >
                 {/* Previous Panels - Absolute positioned, opacity 0.01 */}
                 <Show when={PREV_PANELS().first && PREV_PANELS().second && panelIndex() - 2 >= 1}>
                   <div class="absolute left-0 top-0 flex transition-opacity duration-0" style={{ opacity: 0.001 }}>
@@ -252,53 +266,48 @@ export default function MangaReader() {
                       <img
                         src={convertFileSrc(PREV_PANELS().second?.path!)}
                         alt={PREV_PANELS().second?.title}
-                        class="select-none shadow-[-10px_0_20px_-10px_rgba(0,0,0,0.6)] bg-black"
-                        style={{
-                          height: `${zoom()}px`,
-                          width: "auto",
-                        }}
+                        class="select-none 
+												shadow-[-10px_0_20px_-10px_rgba(0,0,0,0.6)] bg-black 
+												object-contain max-h-[calc(100vh-37px)] max-w-[calc(100vw-50px)]"
                       />
                     </Show>
                     {/* Right panel (always shown) */}
                     <img
                       src={convertFileSrc(PREV_PANELS().first?.path!)}
                       alt={PREV_PANELS().first?.title}
-                      class="select-none shadow-[10px_0_20px_-10px_rgba(0,0,0,0.6)] bg-black"
-                      style={{
-                        height: `${zoom()}px`,
-                        width: "auto",
-                      }}
+                      class="select-none 
+											shadow-[-10px_0_20px_-10px_rgba(0,0,0,0.6)] bg-black 
+											object-contain max-h-[calc(100vh-37px)] max-w-[calc(100vw-50px)]"
                     />
                   </div>
                 </Show>
 
                 {/* Current Panels - Visible */}
-                <div class="flex transition-opacity duration-0" style={{ opacity: 1 }}>
+                <div class="flex flex-row justify-center items-center w-full h-full">
                   {/* Left panel (shown only in double panel mode) */}
                   <Show when={isDoublePanels() && panelIndex() + 1 <= panels()!.length - 1}>
                     <img
                       src={convertFileSrc(CURRENT_PANELS().second?.path!)}
                       alt={CURRENT_PANELS().second?.title}
-                      class="select-none shadow-[-10px_0_20px_-10px_rgba(0,0,0,0.6)] bg-black"
-                      style={{
-                        height: `${zoom()}px`,
-                        width: "auto",
-                      }}
+                      class="select-none 
+												shadow-[-10px_0_20px_-10px_rgba(0,0,0,0.6)] bg-black 
+												object-contain max-h-[calc(100vh-37px)] 
+												max-w-[calc((100vw-10px)/2)]"  // Half the screen width
                     />
                   </Show>
+
                   {/* Right panel (always shown) */}
                   <img
                     src={convertFileSrc(CURRENT_PANELS().first?.path!)}
                     alt={CURRENT_PANELS().first?.title}
-                    class="select-none shadow-[10px_0_20px_-10px_rgba(0,0,0,0.6)] bg-black"
-                    style={{
-                      height: `${zoom()}px`,
-                      width: "auto",
-                    }}
+                    class={cn(`select-none 
+											shadow-[10px_0_20px_-10px_rgba(0,0,0,0.6)] bg-black 
+											object-contain max-h-[calc(100vh-37px)] 
+											max-w-[calc((100vw-10px)/2)]`,
+                      !isDoublePanels() && "max-w-[calc((100vw-10px))]"
+                    )}
                   />
-                </div>
-
-                {/* Next Panels - Absolute positioned, opacity 0.01 */}
+                </div>                {/* Next Panels - Absolute positioned, opacity 0.01 */}
                 <Show when={panelIndex() + 1 <= panels()!.length - 1}>
                   <div class="absolute left-0 top-0 flex transition-opacity duration-0" style={{ opacity: 0.001 }}>
                     {/* Left panel (shown only in double panel mode) */}
@@ -306,22 +315,18 @@ export default function MangaReader() {
                       <img
                         src={convertFileSrc(NEXT_PANELS().second?.path!)}
                         alt={NEXT_PANELS().second?.title}
-                        class="select-none shadow-[-10px_0_20px_-10px_rgba(0,0,0,0.6)] bg-black"
-                        style={{
-                          height: `${zoom()}px`,
-                          width: "auto",
-                        }}
+                        class="select-none 
+												shadow-[-10px_0_20px_-10px_rgba(0,0,0,0.6)] bg-black 
+												object-contain max-h-[calc(100vh-37px)] max-w-[calc(100vw-50px)]"
                       />
                     </Show>
                     {/* Right panel (always shown) */}
                     <img
                       src={convertFileSrc(NEXT_PANELS().first?.path!)}
                       alt={NEXT_PANELS().first?.title}
-                      class="select-none shadow-[10px_0_20px_-10px_rgba(0,0,0,0.6)] bg-black"
-                      style={{
-                        height: `${zoom()}px`,
-                        width: "auto",
-                      }}
+                      class="select-none 
+												shadow-[-10px_0_20px_-10px_rgba(0,0,0,0.6)] bg-black 
+												object-contain max-h-[calc(100vh-37px)] max-w-[calc(100vw-50px)]"
                     />
                   </div>
                 </Show>
