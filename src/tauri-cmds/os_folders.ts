@@ -13,7 +13,7 @@ export async function get_os_folders(userId: string) {
 
 const update_os_folders = async (osFolders: OsFolder[], userId: string) => {
   try {
-		//console.log("updating folder: ", osFolders);
+    //console.log("updating folder: ", osFolders);
     const osFolder: OsFolder = await invoke("update_os_folders", { osFolders, userId });
     return osFolder;
   } catch (error) {
@@ -35,8 +35,8 @@ const delete_os_folders = async (osFolders: OsFolder[], userId: string) => {
 
 const read_os_folder_dir = async (path: string, userId: string, coverImgPath?: string, updateDatetime?: string[]) => {
   try {
-    const osFolder: OsFolder = await invoke("read_os_folder_dir", { path, userId, coverImgPath, updateDatetime });
-    return osFolder;
+    const osFolders: [OsFolder, OsFolder[]] = await invoke("read_os_folder_dir", { path, userId, coverImgPath, updateDatetime });
+    return osFolders;
   } catch (error) {
     console.error("read_os_folder_dir", error);
     return null;
