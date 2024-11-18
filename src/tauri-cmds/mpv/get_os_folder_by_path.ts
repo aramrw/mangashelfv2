@@ -7,7 +7,6 @@ export default async function get_os_folder_by_path(folderPath: string) {
     return osFolder;
   } catch (error) {
     console.error("get_os_folder_by_path:", error);
-    return null;
+    throw new Error(error as string); // throw error to propagate it
   }
 }
-
