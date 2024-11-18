@@ -4,6 +4,7 @@ import { OsFolder, UserType } from "../../models";
 import get_os_folder_by_path from "../../tauri-cmds/mpv/get_os_folder_by_path";
 import { useNavigate } from "@solidjs/router";
 import { IconBook, IconBookFilled } from "@tabler/icons-solidjs";
+import { cn } from "../../libs/cn";
 
 export default function ({
   mainParentFolder,
@@ -50,9 +51,13 @@ export default function ({
         </h3>
       </div>
       <Show when={mainParentFolder()?.title && mainParentFolder()?.cover_img_path}>
-        <div class="relative w-fit flex items-start gap-2 group cursor-pointer"
+        <div class={cn("relative w-fit flex items-start gap-2 group",
+					mainParentFolder()?.last_read_panel && "cursor-pointer"
+				)}
           onClick={() => {
-            navigate(`/reader/${encodeURIComponent(lastReadMangaFolder()?.path!)}`)
+            if (mainParentFolder()?.last_read_panel) {
+              navigate(`/reader/${encodeURIComponent(lastReadMangaFolder()?.path!)}`)
+            }
           }}
         >
           <img
