@@ -13,7 +13,7 @@ import upsert_read_os_dir from "../../tauri-cmds/handle_stale_folder";
 
 export default function Library() {
   const params = useParams();
-  const [folderPath, setFolderPath] = createSignal(decodeURIComponent(params.folder).replace(/\)$/, ""));
+  const [folderPath, setFolderPath] = createSignal(decodeURIComponent(params.folder));
 
   const [mainParentFolder, { refetch: refetchMainParentFolder }] = createResource(
     () => folderPath(),
@@ -32,7 +32,14 @@ export default function Library() {
       && user()
       && childFolders()
     ) {
-      const is_refetch = await upsert_read_os_dir(mainParentFolder()?.path!, user()?.id!, childFolders()!, undefined);
+      const is_refetch = await
+        upsert_read_os_dir(
+          mainParentFolder()?.path!,
+          mainParentFolder()?.parent_path,
+          user()?.id!,
+          childFolders()!,
+          undefined
+        );
       console.log(is_refetch);
       if (is_refetch) {
         await refetchChildFolders();
