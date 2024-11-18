@@ -1,24 +1,23 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 //use std::time::Instant;
 use futures_util::TryStreamExt;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::slice::ParallelSliceMut;
 use std::{env, io};
 use std::{fs::read_dir, process::Command};
 use tokio::io::AsyncWriteExt;
 
 use crate::database::data::v1::MangaPanel;
-use crate::database::update_panels;
-use crate::database::EPISODE_TITLE_REGEX;
+use crate::database::{data::v1::OsFolder, update_os_folders};
+use crate::database::{delete_os_folders, update_panels};
+use crate::database::{delete_panels, EPISODE_TITLE_REGEX};
 use crate::misc::get_date_time;
-use crate::{
-    database::{data::v1::OsFolder, update_os_folders},
-    error::DatabaseError,
-};
 use reqwest::Client;
 use tauri::{command, AppHandle, Emitter, Manager};
 use tauri_plugin_shell::ShellExt;
 
-use crate::error::HttpClientError;
+use crate::error::{HttpClientError, MangaShelfError, ReadDirError};
 
 use phf::phf_set;
 
@@ -51,23 +50,120 @@ fn read_dir_helper(
 }
 
 #[command]
+pub fn upsert_read_os_dir(
+    handle: AppHandle,
+    dir: String,
+    parent_path: Option<String>,
+    user_id: String,
+    c_folders: Option<Vec<OsFolder>>,
+    c_panels: Option<Vec<MangaPanel>>,
+) -> Result<bool, MangaShelfError> {
+    let mut delete_f = Vec::new();
+    let mut delete_p = Vec::new();
+
+    if let Some(c_folders) = &c_folders {
+        for sf in c_folders {
+            if !Path::new(&sf.path).exists() {
+                delete_f.push(sf.clone())
+            }
+        }
+    }
+
+    if let Some(c_panels) = &c_panels {
+        for sp in c_panels {
+            if !Path::new(&sp.path).exists() {
+                delete_p.push(sp.clone());
+            }
+        }
+    }
+
+    if !delete_f.is_empty() {
+        delete_os_folders(handle.clone(), delete_f)?;
+    }
+    if !delete_p.is_empty() {
+        delete_panels(&handle, delete_p)?;
+    }
+
+    let group = match read_os_folder_dir(
+        handle.clone(),
+        dir,
+        user_id,
+        None,
+        parent_path,
+        c_folders,
+        c_panels,
+    ) {
+        Ok(g) => g,
+        Err(ReadDirError::FullyHydrated(_)) => return Ok(false),
+        Err(e) => return Err(MangaShelfError::ReadDir(e)),
+    };
+
+    let (main_folder, mut new_cfs, panels) = group;
+
+    update_panels(&handle, panels, None)?;
+    new_cfs.push(main_folder);
+
+    update_os_folders(handle.clone(), new_cfs.clone())?;
+
+    Ok(true)
+}
+
+type FolderGroup = (OsFolder, Vec<OsFolder>, Vec<MangaPanel>);
+pub trait HasPath {
+    fn path(&self) -> &str;
+}
+
+fn is_stale<O>(old: &[O], new: &[String]) -> bool
+where
+    O: HasPath,
+{
+    // Collect old paths into a HashSet for quick lookup
+    let old_paths: HashSet<&str> = old.iter().map(|x| x.path()).collect();
+    let new_paths: HashSet<&str> = new.iter().map(|x| x.as_str()).collect();
+
+    // Check if there's any new path not in old paths OR any old path not in new paths
+    old_paths != new_paths
+}
+
+#[command]
 pub fn read_os_folder_dir(
     handle: AppHandle,
     path: String,
     user_id: String,
     update_datetime: Option<(String, String)>,
     parent_path: Option<String>,
-) -> Result<OsFolder, DatabaseError> {
-    let mut child_folder_paths: Vec<String> = Vec::new();
+    c_folders: Option<Vec<OsFolder>>,
+    c_panels: Option<Vec<MangaPanel>>,
+) -> Result<FolderGroup, ReadDirError> {
+    let mut childfolder_paths: Vec<String> = Vec::new();
     let mut panel_paths: Vec<String> = Vec::new();
     let mut update_datetime = update_datetime;
+    read_dir_helper(&path, &mut childfolder_paths, &mut panel_paths)?;
 
-    read_dir_helper(&path, &mut child_folder_paths, &mut panel_paths)?;
-    if child_folder_paths.is_empty() && panel_paths.is_empty() {
-        return Err(DatabaseError::IoError(io::Error::new(
+    if childfolder_paths.is_empty() && panel_paths.is_empty() {
+        return Err(ReadDirError::IoError(io::Error::new(
             io::ErrorKind::NotFound,
             format!("{path} contains 0 supported files."),
         )));
+    }
+
+    let mut fully_hydrated = false;
+
+    if let Some(c_folders) = c_folders {
+        if !is_stale(&c_folders, &childfolder_paths) {
+            fully_hydrated = true;
+            //return Err(ReadDirError::FullyHydrated(path));
+        }
+    }
+    if let Some(c_panels) = c_panels {
+        if !is_stale(&c_panels, &panel_paths) && c_panels.iter().all(|p| !p.is_stale_metadata()) {
+            fully_hydrated = true;
+            //return Err(ReadDirError::FullyHydrated(path));
+        }
+    }
+
+    if fully_hydrated {
+        return Err(ReadDirError::FullyHydrated(path));
     }
 
     let os_folder_path_clone = path.clone();
@@ -80,10 +176,12 @@ pub fn read_os_folder_dir(
     let update_date = update_datetime.clone().unwrap().0;
     let update_time = update_datetime.clone().unwrap().1;
 
-    let mut panels: Vec<MangaPanel> = panel_paths
+    let mut total_child_folders: Vec<OsFolder> = Vec::new();
+    let mut total_panels: Vec<MangaPanel> = Vec::new();
+    let mut current_folders_panels: Vec<MangaPanel> = panel_paths
         .into_par_iter()
         .filter_map(|vid_path| {
-            create_manga_panel(
+            MangaPanel::new(
                 user_id.clone(),
                 path.clone(),
                 vid_path,
@@ -93,22 +191,8 @@ pub fn read_os_folder_dir(
             .ok()
         })
         .collect::<Vec<MangaPanel>>();
-
-    let mut child_folders: Vec<OsFolder> = child_folder_paths
-        .into_iter()
-        .filter_map(|folder_path| {
-            read_os_folder_dir(
-                handle.clone(),
-                folder_path,
-                user_id.clone(),
-                update_datetime.clone(),
-                Some(path.clone()),
-            )
-            .ok()
-        })
-        .collect();
-
-    panels.sort_by(|a, b| {
+    let is_manga_folder = !current_folders_panels.is_empty();
+    current_folders_panels.par_sort_by(|a, b| {
         // Extract the episode number from the title using regex
         let num_a = EPISODE_TITLE_REGEX
             .captures(&a.title)
@@ -125,68 +209,59 @@ pub fn read_os_folder_dir(
         num_a.cmp(&num_b)
     });
 
-    let first_panel = panels.first().cloned();
+    total_panels.extend(current_folders_panels);
+
     let mut cover_img = None;
+    let first_panel = total_panels.first().cloned();
     if let Some(first_panel) = &first_panel {
         cover_img = Some(first_panel.path.clone());
-    } else if !child_folders.is_empty() {
-        if let Some(first) = child_folders.first() {
-            cover_img = first.cover_img_path.clone();
-        }
     }
 
-    let folder = OsFolder {
+    let child_folders_group: Vec<FolderGroup> = childfolder_paths
+        .into_par_iter()
+        .filter_map(|folder_path| {
+            read_os_folder_dir(
+                handle.clone(),
+                folder_path,
+                user_id.clone(),
+                update_datetime.clone(),
+                Some(path.clone()),
+                None,
+                None,
+            )
+            .ok()
+        })
+        .collect();
+
+    for group in child_folders_group.into_iter() {
+        let (folder, c_folders, g_panels) = group;
+        total_panels.extend(g_panels);
+
+        if cover_img.is_none() {
+            if let Some(cover_img_path) = &folder.cover_img_path {
+                cover_img = Some(cover_img_path.to_owned());
+            }
+        }
+
+        total_child_folders.push(folder);
+        total_child_folders.extend(c_folders);
+    }
+
+    let main_folder = OsFolder {
         user_id,
         path,
         title: os_folder.file_name().unwrap().to_string_lossy().to_string(),
         parent_path,
         last_read_panel: first_panel,
         cover_img_path: cover_img,
-        is_manga_folder: !panels.is_empty(),
+        is_manga_folder,
         is_double_panels: false,
         zoom: 100,
         update_date,
         update_time,
     };
 
-    child_folders.push(folder.clone());
-
-    update_panels(&handle, panels, None)?;
-    update_os_folders(handle, child_folders)?;
-
-    Ok(folder)
-}
-
-fn create_manga_panel(
-    user_id: String,
-    parent_path: String,
-    path: String,
-    update_date: String,
-    update_time: String,
-) -> Result<MangaPanel, DatabaseError> {
-    let title =
-        Path::new(&path)
-            .file_name()
-            .ok_or_else(|| {
-                DatabaseError::IoError(io::Error::new(
-        io::ErrorKind::InvalidInput,
-        format!("'{path}' contained invalid characters when trying get the the OsVideo title."),
-    ))
-            })?
-            .to_string_lossy()
-            .to_string();
-
-    let vid = MangaPanel {
-        user_id,
-        parent_path,
-        path,
-        title,
-        is_read: false,
-        update_date,
-        update_time,
-    };
-
-    Ok(vid)
+    Ok((main_folder, total_child_folders, total_panels))
 }
 
 #[command]
@@ -262,6 +337,11 @@ pub async fn download_mpv_binary(handle: AppHandle) -> Result<String, HttpClient
     }
 
     Ok(mpv_file_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub fn path_exists(path: String) -> bool {
+    Path::exists(&PathBuf::from(path))
 }
 
 #[tauri::command]

@@ -1,6 +1,6 @@
 {
-  "name": "mpv_shelf_v2",
-  "version": "0.1.0",
+  "name": "mangashelf",
+  "version": "0.2.2",
   "description": "",
   "type": "module",
   "scripts": {

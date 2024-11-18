@@ -12,6 +12,7 @@
     "shell:allow-execute",
     "shell:allow-spawn",
     "dialog:default",
+		"fs:default",
     {
       "identifier": "shell:allow-execute",
       "allow": [

@@ -1,6 +1,6 @@
-import { IconAdjustments, IconArrowNarrowLeftDashed, IconColumns2, IconZoomIn, IconZoomOut } from "@tabler/icons-solidjs";
+import { IconAdjustments, IconArrowNarrowLeftDashed, IconColumns1, IconColumns2, IconZoomIn, IconZoomOut } from "@tabler/icons-solidjs";
 import { A, useNavigate } from "@solidjs/router";
-import { Accessor, createSignal, onCleanup, onMount, Resource, Setter } from "solid-js";
+import { Accessor, createSignal, onCleanup, onMount, Resource, Setter, Show } from "solid-js";
 import { MangaPanel, OsFolder, UserType } from "../../models";
 import { update_os_folders } from "../../tauri-cmds/os_folders";
 
@@ -11,8 +11,6 @@ export default function ReaderNavbar({
   panels,
   panelIndex,
   isDoublePanels,
-  currentZoomLevel,
-  setZoom,
   setPanelIndex,
   setCurrentMangaFolder,
   handleSetDoublePanels,
@@ -29,8 +27,6 @@ export default function ReaderNavbar({
   panels: Resource<MangaPanel[] | null>;
   panelIndex: Accessor<number>;
   isDoublePanels: Accessor<boolean>;
-  currentZoomLevel: Accessor<number>;
-  setZoom: Setter<number>;
   setPanelIndex: Setter<number>,
   setCurrentMangaFolder: Setter<OsFolder | null | undefined>
   handleSetDoublePanels(): Promise<void>;
@@ -47,58 +43,56 @@ export default function ReaderNavbar({
   const [zoomInInterval, setZoomInInterval] = createSignal<number | undefined>(undefined);
   const [zoomOutInterval, setZoomOutInterval] = createSignal<number | undefined>(undefined);
 
-  const handleZoomStart = (type: "magnify" | "minify", setZoom: Setter<number>) => {
-    // Stop any ongoing zoom intervals before starting a new one
-    handleZoomStop().then(() => {
-      const zoomFunction = (type === "magnify")
-        ? () => setZoom((prev) => Math.min(prev + 1, 900)) // Increase by 1, max zoom 200
-        : () => setZoom((prev) => Math.max(prev - 1, 1)); // Decrease by 1, min zoom 1
+  // const handleZoomStart = (type: "magnify" | "minify", setZoom: Setter<number>) => {
+  //   // Stop any ongoing zoom intervals before starting a new one
+  //   handleZoomStop().then(() => {
+  //     const zoomFunction = (type === "magnify")
+  //       ? () => setZoom((prev) => Math.min(prev + 1, 900)) // Increase by 1, max zoom 200
+  //       : () => setZoom((prev) => Math.max(prev - 1, 1)); // Decrease by 1, min zoom 1
+  //
+  //     const zoomLoop = () => {
+  //       zoomFunction();
+  //       if (zoomInInterval()) {
+  //         requestAnimationFrame(zoomLoop); // Keep zooming as long as the interval is active
+  //       }
+  //     };
+  //
+  //     setZoomInInterval(() => requestAnimationFrame(zoomLoop)); // Start the animation loop
+  //   });
+  // };
 
-      const zoomLoop = () => {
-        zoomFunction();
-        if (zoomInInterval()) {
-          requestAnimationFrame(zoomLoop); // Keep zooming as long as the interval is active
-        }
-      };
-
-      setZoomInInterval(() => requestAnimationFrame(zoomLoop)); // Start the animation loop
-    });
-  };
-
-  const handleZoomStop = async () => {
-    // Clear the zoom loop
-    if (zoomInInterval() !== undefined) {
-      cancelAnimationFrame(zoomInInterval()!);
-      setZoomInInterval(undefined);
-    }
-    if (zoomOutInterval() !== undefined) {
-      cancelAnimationFrame(zoomOutInterval()!);
-      setZoomOutInterval(undefined);
-    }
-    let newFolder = structuredClone(folder());
-    if (newFolder && user()?.id) {
-      newFolder.zoom = currentZoomLevel();
-      await update_os_folders([newFolder], user()!.id).then(() => {
-        setCurrentMangaFolder(newFolder);
-      });
-    }
-  };
+  // const handleZoomStop = async () => {
+  //   // Clear the zoom loop
+  //   if (zoomInInterval() !== undefined) {
+  //     cancelAnimationFrame(zoomInInterval()!);
+  //     setZoomInInterval(undefined);
+  //   }
+  //   if (zoomOutInterval() !== undefined) {
+  //     cancelAnimationFrame(zoomOutInterval()!);
+  //     setZoomOutInterval(undefined);
+  //   }
+  //   let newFolder = structuredClone(folder());
+  //   if (newFolder && user()?.id) {
+  //     newFolder.zoom = currentZoomLevel();
+  //     await update_os_folders([newFolder], user()!.id).then(() => {
+  //       setCurrentMangaFolder(newFolder);
+  //     });
+  //   }
+  // };
 
 
   const keyDownHandler = async (event: KeyboardEvent) => {
     event.preventDefault();  // Prevent default behavior like page navigation on keydown
     event.stopPropagation();  // Stop the event from propagating to other listeners 
-    handleZoomStop()
-    if (event.ctrlKey && event.key === "=") {
-      setZoom((prev) => prev + 10);
-    } else if (event.ctrlKey && event.key === "-") {
-      setZoom((prev) => prev - 10);
-    } else {
-      // Other keybinds handling as before
-      await handleKeyDown(
-        event,
-      );
-    }
+    // handleZoomStop()
+    // if (event.ctrlKey && event.key === "=") {
+    //   setZoom((prev) => prev + 10);
+    // } else if (event.ctrlKey && event.key === "-") {
+    //   setZoom((prev) => prev - 10);
+    // } 
+    await handleKeyDown(
+      event,
+    );
   };
 
 
@@ -137,11 +131,11 @@ export default function ReaderNavbar({
     }
 
     // handle zoom level
-    if (event.ctrlKey && event.key === "=") {
-      handleZoomStart("magnify", setZoom);
-    } else if (event.ctrlKey && event.key === "-") {
-      handleZoomStart("minify", setZoom);
-    }
+    // if (event.ctrlKey && event.key === "=") {
+    //   handleZoomStart("magnify", setZoom);
+    // } else if (event.ctrlKey && event.key === "-") {
+    //   handleZoomStart("minify", setZoom);
+    // }
   }
 
   onMount(() => {
@@ -174,28 +168,18 @@ export default function ReaderNavbar({
           >
             <IconArrowNarrowLeftDashed class="text-secondary fill-accent stroke-[2]" />
           </li>
-          <li class="p-1 w-5 h-full flex flex-row justify-center items-center"></li>
+          {/* <li class="p-1 w-5 h-full flex flex-row justify-center items-center"></li> */}
           <li
             class="px-1 h-full flex flex-row justify-center items-center hover:bg-accent transition-colors cursor-pointer"
             onClick={async () => await handleSetDoublePanels()}
           >
-            <IconColumns2 class="text-secondary fill-accent stroke-[1.5]" />
-          </li>
-          <li
-            class="px-1 h-full flex flex-row justify-center items-center hover:bg-accent transition-colors cursor-pointer"
-            onMouseDown={() => handleZoomStart("minify", setZoom)}
-            onMouseUp={async () => await handleZoomStop()}
-            onMouseLeave={async () => await handleZoomStop()}
-          >
-            <IconZoomOut class="text-secondary fill-accent stroke-[1.5]" />
-          </li>
-          <li
-            class="px-1 h-full flex flex-row justify-center items-center hover:bg-accent transition-colors cursor-pointer"
-            onMouseDown={() => handleZoomStart("magnify", setZoom)}
-            onMouseUp={async () => await handleZoomStop()}
-            onMouseLeave={async () => await handleZoomStop()}
-          >
-            <IconZoomIn class="text-secondary fill-accent stroke-[1.5]" />
+            <Show when={isDoublePanels()}
+              fallback={
+                <IconColumns2 class="text-secondary fill-accent stroke-[1.5]" />
+              }
+            >
+              <IconColumns1 class="text-secondary fill-accent stroke-[1.5]" />
+            </Show>
           </li>
         </div>
 

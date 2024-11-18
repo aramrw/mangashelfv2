@@ -2,6 +2,7 @@
 
 use database::init_database;
 use tauri::Manager;
+use tray::kill_dup_process;
 
 mod database;
 mod error;
@@ -14,7 +15,10 @@ use crate::database::{
     get_os_folders_by_path, get_panels, get_prev_folder, get_user_by_id, update_os_folders,
     update_user,
 };
-use crate::fs::{check_cover_img_exists, download_mpv_binary, read_os_folder_dir, show_in_folder};
+use crate::fs::{
+    check_cover_img_exists, download_mpv_binary, path_exists, read_os_folder_dir, show_in_folder,
+    upsert_read_os_dir,
+};
 use crate::tray::init_tray;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -23,10 +27,12 @@ pub fn run() {
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_fs::init())
         .setup(move |app| {
             let handle = app.handle();
             let app_data_dir = handle.path().app_data_dir().unwrap();
             init_database(&app_data_dir, handle).unwrap();
+            kill_dup_process();
             init_tray(app).unwrap();
             Ok(())
         })
@@ -46,12 +52,13 @@ pub fn run() {
             check_cover_img_exists,
             show_in_folder,
             download_mpv_binary,
+            path_exists,
+            upsert_read_os_dir,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
         .run(|_app_handle, event| {
             if let tauri::RunEvent::ExitRequested { api, .. } = event {
-                //for  example, prevent exit and continue running the process in the background
                 api.prevent_exit();
             }
         });

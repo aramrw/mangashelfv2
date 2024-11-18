@@ -13,10 +13,11 @@ export default function Dashboard() {
     if (user) {
       setUser(user);
       const folders = await get_os_folders(user.id);
+      console.log(folders);
       return folders || []; // Always return an array, even if empty
     }
     return []; // Return an empty array if no user is found
-  });
+  })
 
   return (
     <main>

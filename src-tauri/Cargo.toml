@@ -1,6 +1,6 @@
 [package]
-name = "mpv_shelf_v2"
-version = "0.1.0"
+name = "mangashelf"
+version = "0.2.2"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -21,6 +21,7 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2.0.0-rc.15", features = ["protocol-asset", "tray-icon"] }
 tauri-plugin-shell = "2"
 tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 native_db = "0.8.1"
@@ -30,8 +31,10 @@ thiserror = "1.0.65"
 phf = "0.11.2"
 tauri-plugin-os = "2"
 chrono = "0.4.38"
-regex = { version= "1.11.1", features = ["std", "perf"] }
+regex = { version = "1.11.1", features = ["std", "perf"] }
 rayon = "1.10.0"
 reqwest = "0.12.9"
 futures-util = "0.3.31"
 tokio = { version = "1.41.0", features = ["full"] }
+sysinfo = "0.32.0"
+image = "0.25.5"

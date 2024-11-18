@@ -1,5 +1,6 @@
 use std::process;
 
+use sysinfo::{get_current_pid, System};
 use tauri::{
     command,
     menu::{Menu, MenuEvent, MenuItem},
@@ -68,4 +69,19 @@ pub fn build_window(handle: AppHandle, url: Option<&str>) -> Result<WebviewWindo
             .build()?;
 
     Ok(window)
+}
+
+pub fn kill_dup_process() {
+    let mut sys = System::new_all();
+    sys.refresh_all();
+
+    for (pid, proc) in sys.processes() {
+        if proc.name().to_string_lossy().starts_with("mangashelf") {
+            if let Ok(cpid) = get_current_pid() {
+                if cpid != *pid {
+                    proc.kill();
+                }
+            }
+        }
+    }
 }

@@ -47,7 +47,12 @@ const OsFolderCard = ({
 						cursor-pointer duration-200 ease-in-out select-none"
           >
             <div
-              class="h-32 w-24 sm:h-44 sm:w-32 md:h-48 md:w-36 lg:h-52 lg:w-40
+              class="
+							h-32 w-24 
+							sm:h-44 sm:w-32 
+							md:h-48 md:w-36 
+							lg:h-64 lg:w-48
+							xl:h-80 xl:w-56 
 							rounded-sm shadow-md bg-white
 							flex items-center justify-center overflow-hidden relative will-change-transfor"
               onClick={() => {

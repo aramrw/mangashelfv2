@@ -1,6 +1,5 @@
-import { Accessor, createSignal, For, Show } from "solid-js";
+import { Accessor, createSignal, For, Resource, Show } from "solid-js";
 import { OsFolder, UserType } from "../../models";
-import play_video from "../../tauri-cmds/mpv/play_video";
 import ErrorAlert from "../../main-components/error-alert";
 import LibraryFolderCard from "./folder-card";
 import { A, useLocation, useNavigate } from "@solidjs/router";
@@ -10,9 +9,9 @@ export default function LibraryFoldersSection({
   mainParentFolder,
   childFolders
 }: {
-  user: UserType;
-  mainParentFolder: OsFolder;
-  childFolders: OsFolder[];
+  user: Resource<UserType | null>;
+  mainParentFolder: Resource<OsFolder | null>;
+  childFolders: Resource<OsFolder[] | null>;
 }
 ) {
   const navigate = useNavigate();
@@ -29,14 +28,14 @@ export default function LibraryFoldersSection({
         <ul
           class="mx-auto h-fit w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 
 					xl:grid-cols-4 gap-3 lg:px-32 place-items-center">
-          <For each={childFolders}>
+          <For each={childFolders()}>
             {(folder, index) => (
               <LibraryFolderCard
                 index={index}
                 folder={folder}
                 mainParentFolder={mainParentFolder}
                 onClick={() => {
-                  if (folder.last_read_panel) {
+                  if (folder.is_manga_folder) {
                     navigate(`/reader/${encodeURIComponent(folder.path)}`);
                   } else {
                     navigate(`/library/${encodeURIComponent(folder.path)}`);
