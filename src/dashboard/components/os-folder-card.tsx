@@ -43,7 +43,7 @@ const OsFolderCard = ({
           <div
             class=" w-fit
 					flex items-center
-					hover:translate-y-[-1.5px] hover:opacity-80 transition-all
+					hover:translate-y-[-1.5px] transition-all
 						cursor-pointer duration-200 ease-in-out select-none"
           >
             <div
