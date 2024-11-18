@@ -63,7 +63,7 @@ const AddNewSkeleton = ({
               onClick={() => {
                 open({ directory: true }).then((dir_path) => {
                   if (dir_path) {
-                    upsert_read_os_dir(dir_path, user()!.id, undefined).then(() => {
+                    upsert_read_os_dir(dir_path, undefined, user()!.id, undefined, undefined).then(() => {
                       refetch();
                     });
                   }
