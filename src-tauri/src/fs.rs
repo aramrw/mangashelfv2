@@ -52,7 +52,8 @@ fn read_dir_helper(
 #[command]
 pub fn upsert_read_os_dir(
     handle: AppHandle,
-    parent_path: String,
+    dir: String,
+    parent_path: Option<String>,
     user_id: String,
     c_folders: Option<Vec<OsFolder>>,
     c_panels: Option<Vec<MangaPanel>>,
@@ -85,10 +86,10 @@ pub fn upsert_read_os_dir(
 
     let group = match read_os_folder_dir(
         handle.clone(),
-        parent_path,
+        dir,
         user_id,
         None,
-        None,
+        parent_path,
         c_folders,
         c_panels,
     ) {
@@ -101,6 +102,7 @@ pub fn upsert_read_os_dir(
 
     update_panels(&handle, panels, None)?;
     new_cfs.push(main_folder);
+
     update_os_folders(handle.clone(), new_cfs.clone())?;
 
     Ok(true)
@@ -143,24 +145,27 @@ pub fn read_os_folder_dir(
             io::ErrorKind::NotFound,
             format!("{path} contains 0 supported files."),
         )));
-    } else if let Some(c_folders) = c_folders {
+    }
+
+    let mut fully_hydrated = false;
+
+    if let Some(c_folders) = c_folders {
         if !is_stale(&c_folders, &childfolder_paths) {
-            return Err(ReadDirError::FullyHydrated(path));
+            fully_hydrated = true;
+            //return Err(ReadDirError::FullyHydrated(path));
         }
     }
     if let Some(c_panels) = c_panels {
-        // If panels are not stale, this only checks path names
-        if !is_stale(&c_panels, &panel_paths) {
-            // Check each panel's metadata to make sure even tho all the file names
-            // are the same the metadata hasnt been changed
-            let all_panels_up_to_date = c_panels.iter().all(|p| !p.is_stale_metadata());
-
-            if all_panels_up_to_date {
-                // If all panels are up-to-date (not stale), exit early with FullyHydrated
-                return Err(ReadDirError::FullyHydrated(path));
-            }
+        if !is_stale(&c_panels, &panel_paths) && c_panels.iter().all(|p| !p.is_stale_metadata()) {
+            fully_hydrated = true;
+            //return Err(ReadDirError::FullyHydrated(path));
         }
     }
+
+    if fully_hydrated {
+        return Err(ReadDirError::FullyHydrated(path));
+    }
+
     let os_folder_path_clone = path.clone();
     let os_folder = Path::new(&os_folder_path_clone);
     if update_datetime.is_none() {
