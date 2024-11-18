@@ -33,7 +33,7 @@ const AddNewSkeleton = ({
 
       <Popover placement="right-start">
         <PopoverTrigger class="h-fit">
-          <div class="
+          <div class=" z-50
 						w-fit relative flex items-center justify-center 
 						hover:opacity-50 transition-opacity cursor-pointer duration-100 ease-in-out">
             <div
