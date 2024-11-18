@@ -157,7 +157,7 @@ export default function ReaderNavbar({
   });
 
   return (
-    <nav class="md:px-[115px] lg:px-[148px] xl:px-[200px] w-full h-8 bg-primary shadow-md z-[100]">
+    <nav class="md:px-[115px] lg:px-[148px] xl:px-[200px] w-full h-8 bg-primary shadow-md z-[100] mb-0.5">
       <ul class="h-full w-full flex flex-row items-center justify-between relative">
         <div class="w-fit flex flex-row h-full">
           <li

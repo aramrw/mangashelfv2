@@ -12,9 +12,11 @@ import { Transition } from "solid-transition-group";
 import { cn } from "../../libs/cn";
 import upsert_read_os_dir from "../../tauri-cmds/handle_stale_folder";
 import ErrorAlert from "../../main-components/error-alert";
+import { platform } from "@tauri-apps/plugin-os";
 
 export default function MangaReader() {
   const params = useParams();
+  const currentPlatform = platform();
   const [folderPath, setFolderPath] = createSignal(decodeURIComponent(params.folder));
   const [currentMangaFolder, { mutate: setCurrentMangaFolder }] = createResource(folderPath, async (folderPath) => {
     try {
@@ -202,7 +204,9 @@ export default function MangaReader() {
   };
 
   return (
-    <main class="overflow-hidden relative h-[100dvh]" >
+    <main class={cn("overflow-hidden relative h-[100dvh]",
+      currentPlatform === "macos" && "h-full"
+    )}>
       <ReaderNavbar
         user={user}
         folder={currentMangaFolder}
@@ -236,10 +240,11 @@ export default function MangaReader() {
       >
         <Show when={currentMangaFolder.state === "ready"}>
           <Show when={panels.state === "ready" && user.state === "ready"}>
-            <div class="h-full w-full flex justify-center items-center pb-8">
+            <div class="h-full w-full flex justify-center items-center">
               <div
-                class="h-[96.6%] w-1/4 z-20 absolute left-0 flex items-center cursor-pointer
-							justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30"
+                class={cn("h-[95%] w-1/4 z-20 absolute left-0 flex items-center cursor-pointer justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30",
+                  //currentPlatform === "macos" && "h-[90.5%]"
+                )}
                 onClick={async () => {
                   if (isDoublePanels()) {
                     await handleNextPanel();
@@ -251,8 +256,9 @@ export default function MangaReader() {
                 <IconChevronLeft class="h-20 md:h-28 w-auto bg-primary/10 pr-1 text-primary/50 " />
               </div>
               <div
-                class="h-[96.6%] w-1/4 z-20 absolute right-0 flex items-center cursor-pointer
-							justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30"
+                class={cn("h-[95%] w-1/4 z-20 absolute right-0 flex items-center cursor-pointer justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30",
+                  //currentPlatform === "macos" && "h-[90.5%]"
+                )}
                 onClick={async () => {
                   if (isDoublePanels()) {
                     await handlePrevPanel();
@@ -263,9 +269,9 @@ export default function MangaReader() {
               >
                 <IconChevronRight class="h-20 md:h-28 w-auto bg-primary/10 pl-1 text-primary/50 " />
               </div>
-              <h2
+              <h1
                 class="text-nowrap text-secondary rounded-b-sm hover:shadow-md hover:shadow-primary/15
-								select-none font-medium px-3 z-50 h-fit pb-0.5 opacity-0
+								select-none font-medium px-3 z-50 h-fit pb-0.5 opacity-0 cursor-default
 								hover:opacity-100 hover:bg-primary transition-all duration-300"
                 style={{
                   position: "absolute",
@@ -275,7 +281,7 @@ export default function MangaReader() {
                 }}
               >
                 {currentMangaFolder()?.title}
-              </h2>
+              </h1>
 
               <div class="relative flex flex-row justify-center items-center"
               >
@@ -288,8 +294,7 @@ export default function MangaReader() {
                         src={convertFileSrc(PREV_PANELS().second?.path!)}
                         alt={PREV_PANELS().second?.title}
                         class="select-none 
-												shadow-[-10px_0_20px_-10px_rgba(0,0,0,0.6)] bg-black 
-												object-contain max-h-[calc(100vh-37px)] max-w-[calc(100vw-50px)]"
+												bg-black object-contain max-h-[calc(100vh-37px)] max-w-[calc(100vw-50px)]"
                       />
                     </Show>
                     {/* Right panel (always shown) */}
@@ -297,8 +302,7 @@ export default function MangaReader() {
                       src={convertFileSrc(PREV_PANELS().first?.path!)}
                       alt={PREV_PANELS().first?.title}
                       class="select-none 
-											shadow-[-10px_0_20px_-10px_rgba(0,0,0,0.6)] bg-black 
-											object-contain max-h-[calc(100vh-37px)] max-w-[calc(100vw-50px)]"
+											bg-black object-contain max-h-[calc(100vh-37px)] max-w-[calc(100vw-50px)]"
                     />
                   </div>
                 </Show>
@@ -311,9 +315,10 @@ export default function MangaReader() {
                       src={convertFileSrc(CURRENT_PANELS().second?.path!)}
                       alt={CURRENT_PANELS().second?.title}
                       class="select-none 
-												shadow-[-10px_0_20px_-10px_rgba(0,0,0,0.6)] bg-black 
-												object-contain max-h-[calc(100vh-37px)] 
-												max-w-[calc((100vw-10px)/2)]"  // Half the screen width
+											 bg-black 
+											 object-contain max-h-[calc(100vh-37px)] 
+											 max-w-[calc((100vw-10px)/2)] 
+											 shadow-[-10px_0_20px_-14px_rgba(0,0,0,0.6)]"  // Shadow only on the outer left
                     />
                   </Show>
 
@@ -321,14 +326,18 @@ export default function MangaReader() {
                   <img
                     src={convertFileSrc(CURRENT_PANELS().first?.path!)}
                     alt={CURRENT_PANELS().first?.title}
-                    class={cn(`select-none 
-											shadow-[10px_0_20px_-10px_rgba(0,0,0,0.6)] bg-black 
-											object-contain max-h-[calc(100vh-37px)] 
-											max-w-[calc((100vw-10px)/2)]`,
-                      !isDoublePanels() && "max-w-[calc((100vw-10px))]"
+                    class={cn(
+										`select-none 
+										 bg-black 
+										 object-contain max-h-[calc(100vh-37px)] 
+										 max-w-[calc((100vw-10px)/2)]`,
+									isDoublePanels()
+										? "shadow-[10px_0_20px_-14px_rgba(0,0,0,0.6)]" 
+										: "max-w-[calc((100vw-10px))] shadow-[0_0_20px_-10px_rgba(0,0,0,0.6)]" 
                     )}
                   />
                 </div>
+
                 {/* Next Panels - Absolute positioned, opacity 0.01 */}
                 <Show when={panelIndex() + 1 <= panels()!.length - 1}>
                   <div class="absolute left-0 top-0 flex transition-opacity duration-0" style={{ opacity: 0.01 }}>
@@ -338,7 +347,7 @@ export default function MangaReader() {
                         src={convertFileSrc(NEXT_PANELS().second?.path!)}
                         alt={NEXT_PANELS().second?.title}
                         class="select-none 
-												shadow-[-10px_0_20px_-10px_rgba(0,0,0,0.6)] bg-black 
+												bg-black 
 												object-contain max-h-[calc(100vh-37px)] max-w-[calc(100vw-50px)]"
                       />
                     </Show>
@@ -347,14 +356,14 @@ export default function MangaReader() {
                       src={convertFileSrc(NEXT_PANELS().first?.path!)}
                       alt={NEXT_PANELS().first?.title}
                       class="select-none 
-												shadow-[-10px_0_20px_-10px_rgba(0,0,0,0.6)] bg-black 
+												bg-black 
 												object-contain max-h-[calc(100vh-37px)] max-w-[calc(100vw-50px)]"
                     />
                   </div>
                 </Show>
               </div>
               <h2
-                class="rounded-t-sm hover:shadow-md hover:shadow-primary select-none text-accent/35 font-medium px-3 py-1 hover:text-secondary hover:bg-primary transition-all duration-300"
+                class="rounded-t-sm hover:shadow-md hover:shadow-primary select-none text-accent/35 font-medium px-3 hover:text-secondary hover:bg-primary transition-all duration-300"
                 style={{
                   position: "absolute",
                   bottom: "0",
@@ -364,9 +373,9 @@ export default function MangaReader() {
               >
                 {panelIndex()}/{panels()?.length! - 1}
               </h2>
-              <p class="text-sm select-none absolute right-0 bottom-0 text-muted font-medium px-3 py-1">{CURRENT_PANELS().first?.title}</p>
+              <p class="text-sm select-none absolute right-0 bottom-0 text-muted font-medium px-3">{CURRENT_PANELS().first?.title}</p>
               <Show when={isDoublePanels()}>
-                <p class="text-sm select-none absolute left-0 bottom-0 text-muted font-medium px-3 py-1">{CURRENT_PANELS().second?.title}</p>
+                <p class="text-sm select-none absolute left-0 bottom-0 text-muted font-medium px-3">{CURRENT_PANELS().second?.title}</p>
               </Show>
             </div>
           </Show>
