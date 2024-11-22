@@ -17,6 +17,8 @@ pub enum MangaShelfError {
     Database(#[from] DatabaseError),
     #[error("{0}")]
     ReadDir(#[from] ReadDirError),
+    #[error("{0:#?}")]
+    Io(#[from] io::Error),
 }
 
 #[derive(thiserror::Error, Debug)]

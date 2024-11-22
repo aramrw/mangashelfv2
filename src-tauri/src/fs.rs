@@ -71,39 +71,12 @@ fn read_dir_helper(
 
 fn delete_stale_entries(
     handle: AppHandle,
-    old_dirs: Option<&[OsFolder]>,
-    old_panels: Option<&[MangaPanel]>,
-) -> Result<bool, DatabaseError> {
-    let mut refetch = false;
-    let mut del_folders = Vec::new();
-    let mut del_panels = Vec::new();
-
-    if let Some(old_dirs) = old_dirs {
-        for f in old_dirs {
-            if !Path::new(&f.path).exists() {
-                del_folders.push(f.clone())
-            }
-        }
-    }
-
-    if let Some(old_panels) = old_panels {
-        for p in old_panels {
-            if !Path::new(&p.path).exists() {
-                del_panels.push(p.clone());
-            }
-        }
-    }
-
-    if !del_folders.is_empty() {
-        refetch = true;
-        delete_os_folders(handle.clone(), del_folders)?;
-    }
-    if !del_panels.is_empty() {
-        refetch = true;
-        delete_panels(&handle, del_panels)?;
-    }
-
-    Ok(refetch)
+    old_dirs: Vec<OsFolder>,
+    old_panels: Vec<MangaPanel>,
+) -> Result<(), DatabaseError> {
+    delete_os_folders(handle.clone(), old_dirs)?;
+    delete_panels(&handle, old_panels)?;
+    Ok(())
 }
 
 type FolderGroup = (OsFolder, Vec<OsFolder>, Vec<MangaPanel>);
@@ -121,6 +94,7 @@ pub enum StaleEntries {
     Found {
         dirs: Option<HashSet<String>>,
         panels: Option<HashSet<String>>,
+        deleted: Option<(Vec<OsFolder>, Vec<MangaPanel>)>,
     },
     None,
 }
@@ -137,10 +111,10 @@ where
     I: Iterator<Item = &'a String>,
 {
     // Normalize old paths and collect them into a set.
-    let old_paths: HashSet<String> = old.iter().map(|x| normalize_path(x.path())).collect();
+    let old_paths: HashSet<String> = old.iter().map(|x| x.path().to_string()).collect();
 
     // Normalize new paths and collect them into a set.
-    let new_paths: HashSet<String> = new.map(|p| normalize_path(p)).collect();
+    let new_paths: HashSet<String> = new.cloned().collect();
 
     // Find paths missing in the new set (deletions) and paths missing in the old set (additions).
     let missing: HashSet<String> = old_paths
@@ -176,7 +150,7 @@ fn find_stale_metadata(
                 result.insert(new_path.clone()); // Add to result if metadata is stale.
             }
         } else {
-            result.insert(new_path.clone()); // Add missing panel to result (panel was deleted).
+            result.insert(new_path.clone()); // Add missing panel to result (panel was added).
         }
     });
 
@@ -198,26 +172,71 @@ fn find_stale_metadata(
 
 fn find_stale_entries(
     main_dir: &str,
-    old_dirs: Option<&[OsFolder]>,
-    old_panels: Option<&[MangaPanel]>,
+    old_dirs: Option<&mut Vec<OsFolder>>,
+    old_panels: Option<&mut Vec<MangaPanel>>,
 ) -> Result<StaleEntries, ReadDirError> {
     // Collect new directories and panels from the filesystem.
     let mut new_dirs = HashSet::new();
     let mut new_panels = HashSet::new();
     read_dir_helper(main_dir, &mut new_dirs, &mut new_panels)?;
 
-    // Default to empty slices if `old_dirs` or `old_panels` are `None`.
-    let old_dirs = old_dirs.unwrap_or_default();
-    let old_panels = old_panels.unwrap_or_default();
+    // If both old_dirs and old_panels are None, this is a fresh scan (no previous entries).
+    if old_dirs.is_none() && old_panels.is_none() {
+        return Ok(StaleEntries::None);
+    }
 
-    // Compare old and new entries to determine which are stale.
+    let old_dirs = match old_dirs {
+        Some(dirs) => dirs,
+        None => &mut Vec::new(),
+    };
+
+    let old_panels = match old_panels {
+        Some(panels) => panels,
+        None => &mut Vec::new(),
+    };
+
+    // Filter out missing panels (deleted panels)
+    let deleted_panels: Vec<MangaPanel> = old_panels
+        .iter()
+        .filter_map(|pan| {
+            if !path_exists(&pan.path) {
+                return Some(pan.clone());
+            }
+            None
+        })
+        .collect();
+
+    // Filter out missing directories (deleted dirs)
+    let deleted_dirs: Vec<OsFolder> = old_dirs
+        .iter()
+        .filter_map(|dir| {
+            if !path_exists(&dir.path) {
+                return Some(dir.clone());
+            }
+            None
+        })
+        .collect();
+
+    // Remove deleted panels and dirs from old_dirs and old_panels
+    old_dirs.retain(|dir| !deleted_dirs.iter().any(|del| del.path == dir.path));
+    old_panels.retain(|panel| !deleted_panels.iter().any(|del| del.path == panel.path));
+
+    // Find missing paths (stale directories) and panels
     let dirs = find_missing_paths(old_dirs, new_dirs.iter());
     let panels = find_stale_metadata(old_panels, &new_panels);
 
-    // If no new entries are found, return `None`. Otherwise, return the found entries.
-    match (&dirs, &panels) {
-        (None, None) => Ok(StaleEntries::None),
-        _ => Ok(StaleEntries::Found { dirs, panels }),
+    // Return the found stale entries, including deleted items
+    match (
+        &dirs,
+        &panels,
+        deleted_dirs.is_empty() && deleted_panels.is_empty(),
+    ) {
+        (None, None, true) => Ok(StaleEntries::None),
+        _ => Ok(StaleEntries::Found {
+            dirs,
+            panels,
+            deleted: Some((deleted_dirs, deleted_panels)), // Combine deleted dirs and panels into one list
+        }),
     }
 }
 
@@ -227,26 +246,37 @@ pub fn upsert_read_os_dir(
     dir: String,
     parent_path: Option<String>,
     user_id: String,
-    old_dirs: Option<Vec<OsFolder>>,
-    old_panels: Option<Vec<MangaPanel>>,
+    mut old_dirs: Option<Vec<OsFolder>>,
+    mut old_panels: Option<Vec<MangaPanel>>,
 ) -> Result<bool, MangaShelfError> {
     // Find stale entries based on the provided directory and old data.
-    let stale_entries = find_stale_entries(&dir, old_dirs.as_deref(), old_panels.as_deref())?;
+    let mut stale_entries = find_stale_entries(&dir, old_dirs.as_mut(), old_panels.as_mut())?;
     println!("stale_entries: {:#?}", stale_entries);
 
     // If there are no stale entries and either `old_dirs` or `old_panels` is provided,
     // return `false` to prevent unnecessary re-rendering.
     if (old_dirs.is_some() || old_panels.is_some()) && stale_entries.is_none() {
-        println!("fully hydrated, re-reading dir is not necessary.");
         return Ok(false);
     }
 
-    // Delete stale entries and track whether a refetch is needed.
-    delete_stale_entries(handle.clone(), old_dirs.as_deref(), old_panels.as_deref())?;
+    if let StaleEntries::Found {
+        ref mut deleted, ..
+    } = stale_entries
+    {
+        if let Some(deleted_entries) = deleted.take() {
+            // Only move the deleted entries.
+            delete_stale_entries(handle.clone(), deleted_entries.0, deleted_entries.1)?;
+        }
+    }
 
-    // Read the OS folder directory and retrieve updated data.
+    if let StaleEntries::Found { dirs, panels, .. } = &stale_entries {
+        if dirs.is_none() && panels.is_none() {
+            stale_entries = StaleEntries::None
+        }
+    }
+
     let (main_folder, mut new_cfs, panels) =
-        read_os_folder_dir(dir, user_id, None, parent_path, &stale_entries)?;
+        read_os_folder_dir(dir, user_id, None, parent_path, stale_entries)?;
 
     // Update panels and folders with the new data.
     update_panels(&handle, panels, None)?;
@@ -262,7 +292,7 @@ pub fn read_os_folder_dir(
     user_id: String,
     update_datetime: Option<(String, String)>,
     parent_path: Option<String>,
-    stale_entries: &StaleEntries,
+    stale_entries: StaleEntries,
 ) -> Result<FolderGroup, ReadDirError> {
     let mut childfolder_paths: Vec<String> = Vec::new();
     let mut panel_paths: Vec<String> = Vec::new();
@@ -273,8 +303,23 @@ pub fn read_os_folder_dir(
             io::ErrorKind::NotFound,
             format!("{path} contains 0 supported files."),
         )));
-    }
+    } else {
+        // Only filter if stale_entries is `Found`, otherwise process all paths.
+        if let StaleEntries::Found { dirs, panels, .. } = stale_entries {
+            let stale_dirs = dirs.unwrap_or_default();
+            let stale_panels = panels.unwrap_or_default();
 
+            // Filter out stale child folders that are not in the stale_dirs.
+            childfolder_paths.retain(|folder| stale_dirs.contains(folder));
+
+            panel_paths.retain(|panel| {
+                let retain = stale_panels.contains(panel);
+                println!("Checking if {} is in stale_panels: {}", panel, retain);
+                retain
+            });
+        }
+        // If stale_entries is `None`, do nothing, no filtering occurs.
+    }
     let os_folder_path_clone = path.clone();
     let os_folder = Path::new(&os_folder_path_clone);
     let (update_date, update_time) = update_datetime.clone().unwrap_or_else(get_date_time);
@@ -295,6 +340,12 @@ pub fn read_os_folder_dir(
         })
         .collect::<Vec<MangaPanel>>();
     let is_manga_folder = !current_folders_panels.is_empty();
+    if current_folders_panels.is_empty() {
+        println!(
+            "{} current_folders_panels is empty, this is not a manga folder",
+            path
+        );
+    }
     total_panels.extend(current_folders_panels);
 
     total_panels.par_sort_by(|a, b| {
@@ -325,7 +376,7 @@ pub fn read_os_folder_dir(
                 user_id.clone(),
                 update_datetime.clone(),
                 Some(path.clone()),
-                stale_entries,
+                StaleEntries::None,
             )
             .ok()
         })
@@ -439,7 +490,7 @@ pub async fn download_mpv_binary(handle: AppHandle) -> Result<String, HttpClient
 }
 
 #[tauri::command]
-pub fn path_exists(path: String) -> bool {
+pub fn path_exists(path: &str) -> bool {
     Path::exists(&PathBuf::from(path))
 }
 

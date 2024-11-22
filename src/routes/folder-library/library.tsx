@@ -51,6 +51,7 @@ export default function Library() {
         setHasFullyHydrated(true);
         await refetchChildFolders();
       }
+      console.log(childFolders())
     }
   });
 
