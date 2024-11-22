@@ -13,7 +13,7 @@ export async function get_os_folders(userId: string) {
 
 const update_os_folders = async (osFolders: OsFolder[], userId: string) => {
   try {
-    //console.log("updating folder: ", osFolders);
+    console.log("updating folders: ", osFolders);
     const osFolder: OsFolder = await invoke("update_os_folders", { osFolders, userId });
     return osFolder;
   } catch (error) {
