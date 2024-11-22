@@ -294,8 +294,8 @@ pub fn read_os_folder_dir(
     parent_path: Option<String>,
     stale_entries: StaleEntries,
 ) -> Result<FolderGroup, ReadDirError> {
-    let mut childfolder_paths: Vec<String> = Vec::new();
-    let mut panel_paths: Vec<String> = Vec::new();
+    let mut childfolder_paths = HashSet::new();
+    let mut panel_paths = HashSet::new();
     read_dir_helper(&path, &mut childfolder_paths, &mut panel_paths)?;
 
     if childfolder_paths.is_empty() && panel_paths.is_empty() {
@@ -310,9 +310,9 @@ pub fn read_os_folder_dir(
             let stale_panels = panels.unwrap_or_default();
 
             // Filter out stale child folders that are not in the stale_dirs.
-            childfolder_paths.retain(|folder| stale_dirs.contains(folder));
+            childfolder_paths = stale_dirs;
 
-            panel_paths.retain(|panel| stale_panels.contains(panel));
+            panel_paths = stale_panels;
         }
         // If stale_entries is `None`, do nothing, no filtering occurs.
     }
