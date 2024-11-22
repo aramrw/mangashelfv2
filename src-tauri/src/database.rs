@@ -8,6 +8,7 @@ use std::{
 
 use data::v1::{MangaPanel, MangaPanelKey, OsFolder, OsFolderKey, User};
 use native_db::*;
+use rayon::slice::ParallelSliceMut;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tauri::{command, AppHandle, Manager};
@@ -25,7 +26,7 @@ pub static EPISODE_TITLE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     .unwrap()
 });
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, Hash, PartialEq)]
 pub struct FileMetadata {
     pub created: Option<SystemTime>,
     pub modified: Option<SystemTime>,
@@ -106,11 +107,12 @@ pub mod data {
             pub is_manga_folder: bool,
             pub is_double_panels: bool,
             pub zoom: usize,
+            pub is_hidden: bool,
             pub update_date: String,
             pub update_time: String,
         }
 
-        #[derive(Serialize, Deserialize, Clone, Debug)]
+        #[derive(Serialize, Deserialize, Clone, Debug, Eq, Hash, PartialEq)]
         #[native_model(id = 4, version = 1)]
         #[native_db]
         pub struct MangaPanel {
@@ -279,7 +281,7 @@ pub fn get_os_folders_by_path(
     let db = Builder::new().create(&DBMODELS, db_path)?;
 
     let rtx = db.r_transaction()?;
-    let folders: Vec<OsFolder> = rtx
+    let mut folders: Vec<OsFolder> = rtx
         .scan()
         .secondary(OsFolderKey::parent_path)?
         .start_with(Some(parent_path.as_str()))?
@@ -290,6 +292,23 @@ pub fn get_os_folders_by_path(
             "0 child folders found in dir: {parent_path}",
         )));
     }
+
+    folders.par_sort_by(|a, b| {
+        // Extract the episode number from the title using regex
+        let num_a = EPISODE_TITLE_REGEX
+            .captures(&a.title)
+            .and_then(|caps| caps.get(1)) // Assuming the first capturing group contains the episode number
+            .and_then(|m| m.as_str().parse::<u32>().ok())
+            .unwrap_or(0);
+
+        let num_b = EPISODE_TITLE_REGEX
+            .captures(&b.title)
+            .and_then(|caps| caps.get(1))
+            .and_then(|m| m.as_str().parse::<u32>().ok())
+            .unwrap_or(0);
+
+        num_a.cmp(&num_b)
+    });
 
     Ok(folders)
 }
@@ -305,6 +324,8 @@ pub fn update_os_folders(
     let (date, time) = get_date_time();
 
     for mut folder in os_folders {
+        //println!("updating dir: {}", folder.path);
+
         folder.update_date = date.clone();
         folder.update_time = time.clone();
 
