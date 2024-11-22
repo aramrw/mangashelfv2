@@ -235,7 +235,7 @@ fn find_stale_entries(
         _ => Ok(StaleEntries::Found {
             dirs,
             panels,
-            deleted: Some((deleted_dirs, deleted_panels)), // Combine deleted dirs and panels into one list
+            deleted: Some((deleted_dirs, deleted_panels)), 
         }),
     }
 }
