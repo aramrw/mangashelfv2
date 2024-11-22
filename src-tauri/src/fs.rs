@@ -235,7 +235,7 @@ fn find_stale_entries(
         _ => Ok(StaleEntries::Found {
             dirs,
             panels,
-            deleted: Some((deleted_dirs, deleted_panels)), 
+            deleted: Some((deleted_dirs, deleted_panels)),
         }),
     }
 }
@@ -251,7 +251,7 @@ pub fn upsert_read_os_dir(
 ) -> Result<bool, MangaShelfError> {
     // Find stale entries based on the provided directory and old data.
     let mut stale_entries = find_stale_entries(&dir, old_dirs.as_mut(), old_panels.as_mut())?;
-    println!("stale_entries: {:#?}", stale_entries);
+    //println!("stale_entries: {:#?}", stale_entries);
 
     // If there are no stale entries and either `old_dirs` or `old_panels` is provided,
     // return `false` to prevent unnecessary re-rendering.
@@ -312,11 +312,7 @@ pub fn read_os_folder_dir(
             // Filter out stale child folders that are not in the stale_dirs.
             childfolder_paths.retain(|folder| stale_dirs.contains(folder));
 
-            panel_paths.retain(|panel| {
-                let retain = stale_panels.contains(panel);
-                println!("Checking if {} is in stale_panels: {}", panel, retain);
-                retain
-            });
+            panel_paths.retain(|panel| stale_panels.contains(panel));
         }
         // If stale_entries is `None`, do nothing, no filtering occurs.
     }
@@ -340,12 +336,6 @@ pub fn read_os_folder_dir(
         })
         .collect::<Vec<MangaPanel>>();
     let is_manga_folder = !current_folders_panels.is_empty();
-    if current_folders_panels.is_empty() {
-        println!(
-            "{} current_folders_panels is empty, this is not a manga folder",
-            path
-        );
-    }
     total_panels.extend(current_folders_panels);
 
     total_panels.par_sort_by(|a, b| {
