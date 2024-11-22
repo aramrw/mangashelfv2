@@ -5,7 +5,7 @@ import ReaderNavbar from "./reader-nav";
 import get_user_by_id from "../../tauri-cmds/get_user_by_id";
 import { get_panels } from "../../tauri-cmds/get_panels";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import { IconChevronLeft, IconChevronRight } from "@tabler/icons-solidjs";
+import { IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight } from "@tabler/icons-solidjs";
 import { update_os_folders } from "../../tauri-cmds/os_folders";
 import { MangaPanel, OsFolder } from "../../models";
 import { Transition } from "solid-transition-group";
@@ -145,7 +145,7 @@ export default function MangaReader() {
   };
 
   const handleSetLastPanel = async () => {
-    if (panels.state !== "ready") {
+    if (!panels()) {
       return;
     }
 
@@ -238,11 +238,15 @@ export default function MangaReader() {
               <div class="h-full w-full flex justify-center items-center pt-0.5">
                 <NavigationButtons
                   currentPlatform={currentPlatform}
+                  isLastPanel={() => panelIndex() === panels()?.length! - 1}
+                  isFirstPanel={() => panelIndex() === 0}
                   isDoublePanels={isDoublePanels}
                   handleNextPanel={handleNextPanel}
                   handlePrevPanel={handlePrevPanel}
                   handleNextSinglePanel={handleNextSinglePanel}
                   handlePrevSinglePanel={handlePrevSinglePanel}
+                  handleSetLastPanel={handleSetLastPanel}
+                  handleSetFirstPanel={handleSetFirstPanel}
                 />
                 <h1
                   class="text-nowrap text-secondary rounded-b-sm hover:shadow-md hover:shadow-primary/50
@@ -325,7 +329,7 @@ export default function MangaReader() {
                     transform: "translateX(-50%)",
                   }}
                 >
-                  {panelIndex()}/{panels()?.length! - 1}
+                  {panelIndex() + 1}/{panels()?.length!}
                 </h2>
                 <p class="text-sm select-none absolute right-0 bottom-0 text-muted font-medium px-3">{CURRENT_PANELS().first?.title}</p>
                 <Show when={isDoublePanels()}>
@@ -342,29 +346,42 @@ export default function MangaReader() {
 
 interface NavigationButtonsProps {
   currentPlatform: Platform;
+  isLastPanel: () => boolean;
+  isFirstPanel: () => boolean;
   isDoublePanels: () => boolean;
   handleNextPanel: () => Promise<void>;
   handlePrevPanel: () => Promise<void>;
   handleNextSinglePanel: () => Promise<void>;
   handlePrevSinglePanel: () => Promise<void>;
+  handleSetLastPanel: () => Promise<void>;
+  handleSetFirstPanel: () => Promise<void>;
 }
 
 const NavigationButtons = ({
   currentPlatform,
+  isLastPanel,
+  isFirstPanel,
   isDoublePanels,
   handleNextPanel,
   handlePrevPanel,
   handleNextSinglePanel,
   handlePrevSinglePanel,
+  handleSetLastPanel,
+  handleSetFirstPanel
 }: NavigationButtonsProps) => (
   <>
     {/* Left Button */}
     <div
       class={cn(
         "h-[97.1%] w-1/4 z-20 absolute left-0 flex items-center cursor-pointer justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30",
-        currentPlatform === "macos" && "h-full"
+        currentPlatform === "macos" && "h-full",
+        isLastPanel() && "opacity-30 bg-primary/15 animate-pulse"
       )}
       onClick={async () => {
+        if (isLastPanel()) {
+          handleSetLastPanel();
+          return;
+        }
         if (isDoublePanels()) {
           await handleNextPanel();
         } else {
@@ -372,16 +389,29 @@ const NavigationButtons = ({
         }
       }}
     >
-      <IconChevronLeft class="h-20 md:h-32 lg:h-40 xl:h-56 w-auto bg-primary/10 pl-1 text-primary/50 " />
+      <Show when={isLastPanel()}
+        fallback={
+          <IconChevronLeft class="h-20 md:h-32 lg:h-40 xl:h-56 w-auto bg-primary/10 pl-1 text-primary/50 rounded-md" />
+        }
+      >
+        <IconChevronsLeft class="h-20 md:h-32 lg:h-40 xl:h-56 w-auto bg-primary/15 pl-1 text-primary/50 rounded-md" />
+
+      </Show>
     </div>
 
     {/* Right Button */}
     <div
       class={cn(
         "h-[97.1%] w-1/4 z-20 absolute right-0 flex items-center cursor-pointer justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30",
-        currentPlatform === "macos" && "h-full"
+        currentPlatform === "macos" && "h-full",
+        isFirstPanel() && "hover:opacity-70"
       )}
       onClick={async () => {
+        if (isFirstPanel()) {
+          handleSetFirstPanel();
+          return;
+        }
+
         if (isDoublePanels()) {
           await handlePrevPanel();
         } else {
@@ -389,7 +419,13 @@ const NavigationButtons = ({
         }
       }}
     >
-      <IconChevronRight class="h-20 md:h-32 lg:h-40 xl:h-56 w-auto bg-primary/10 pl-1 text-primary/50 " />
+      <Show when={isFirstPanel()}
+        fallback={
+          <IconChevronRight class="h-20 md:h-32 lg:h-40 xl:h-56 w-auto bg-primary/10 pl-1 text-primary/50 rounded-md" />
+        }
+      >
+        <IconChevronsRight class="h-20 md:h-32 lg:h-40 xl:h-56 w-auto bg-primary/10 pl-1 text-primary/50 rounded-md" />
+      </Show>
     </div>
   </>
 );
