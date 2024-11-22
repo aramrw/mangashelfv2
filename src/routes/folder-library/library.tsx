@@ -13,20 +13,26 @@ import upsert_read_os_dir from "../../tauri-cmds/handle_stale_folder";
 
 export default function Library() {
   const params = useParams();
-  const [folderPath, setFolderPath] = createSignal(decodeURIComponent(params.folder));
+  const [folderPath] = createSignal(decodeURIComponent(params.folder));
 
-  const [mainParentFolder, { refetch: refetchMainParentFolder }] = createResource(
+  const [mainParentFolder] = createResource(
     () => folderPath(),
     get_os_folder_by_path
   );
   const [user] = createResource(() => (mainParentFolder() ? mainParentFolder()?.user_id : null), get_user_by_id);
-  const [childFolders, { refetch: refetchChildFolders }] = createResource(() => (mainParentFolder() ? mainParentFolder()?.path : null), get_os_folders_by_path);
+  const [childFolders, { refetch: refetchChildFolders }] = createResource(
+    () => (mainParentFolder() ? mainParentFolder()?.path : null), get_os_folders_by_path);
+  const [lastReadMangaFolder] = createResource(
+    () => mainParentFolder()?.last_read_panel ? mainParentFolder()?.last_read_panel?.parent_path : null,
+    get_os_folder_by_path
+  );
 
-  const [hasInitialized, setHasInitialized] = createSignal(false);
+  const [hasFullyHydrated, setHasFullyHydrated] = createSignal(false);
+  const [showHiddenChildFolders, setShowHiddenChildFolders] = createSignal(false);
 
   createEffect(async () => {
     if (
-      !hasInitialized()
+      !hasFullyHydrated()
       && folderPath()
       && mainParentFolder()
       && user()
@@ -40,17 +46,20 @@ export default function Library() {
           childFolders()!,
           undefined
         );
-      console.log(is_refetch);
       if (is_refetch) {
+        console.log("stale values detected, refreshing...")
+        setHasFullyHydrated(true);
         await refetchChildFolders();
-        setHasInitialized(true);
       }
     }
   });
 
   return (
     <main class="w-full h-[100vh] relative overflow-auto" style={{ "scrollbar-gutter": "stable" }}>
-      <NavBar />
+      <NavBar
+        showHiddenFolders={showHiddenChildFolders}
+        setShowHiddenFolders={setShowHiddenChildFolders}
+      />
       <Transition
         appear={true}
         onEnter={(el, done) => {
@@ -63,7 +72,8 @@ export default function Library() {
         }}
       >
         <Tabs defaultValue="volumes" class="w-full" orientation="horizontal">
-          <Show when={mainParentFolder.state === "ready" && user.state === "ready"}>
+          <Show
+            when={mainParentFolder.state === "ready" && user.state === "ready"}>
             <Transition
               appear={true}
               onEnter={(el, done) => {
@@ -75,7 +85,10 @@ export default function Library() {
                 a.finished.then(done);
               }}
             >
-              <LibraryHeader mainParentFolder={mainParentFolder} user={user} />
+              <LibraryHeader
+                mainParentFolder={mainParentFolder}
+                user={user}
+                lastReadMangaFolder={lastReadMangaFolder} />
             </Transition>
             <TabsList class="w-full h-9 border">
               <Show when={childFolders()}>
@@ -88,7 +101,13 @@ export default function Library() {
             </TabsList>
             <Show when={childFolders()}>
               <TabsContent value="volumes">
-                <LibraryFoldersSection user={user} mainParentFolder={mainParentFolder} childFolders={childFolders} />
+                <LibraryFoldersSection
+                  user={user}
+                  mainParentFolder={mainParentFolder}
+                  childFolders={childFolders}
+                  refetchChildFolders={refetchChildFolders}
+                  showHiddenChildFolders={showHiddenChildFolders}
+                />
               </TabsContent>
             </Show>
           </Show>
