@@ -1,4 +1,4 @@
-import { OsFolder, } from "../../models";
+import { OsFolder, UserType, } from "../../models";
 import { Accessor, Resource, Show } from "solid-js";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import {
@@ -8,21 +8,25 @@ import {
 import { Transition } from "solid-transition-group";
 import FolderCardContextMenuContent from "../../dashboard/components/folder-card-cm-context";
 import { platform } from "@tauri-apps/plugin-os";
+import { cn } from "../../libs/cn";
+import IconHeroSlashEye from "../../main-components/icons/icon-hero-slash-eye";
 
 const LibraryFolderCard = ({
+  user,
   index,
   folder,
   mainParentFolder,
+  refetchChildFolders,
   onClick,
 }: {
+  user: Resource<UserType | null>;
   index: Accessor<number>;
   folder: OsFolder;
   mainParentFolder: Resource<OsFolder | null>;
+  refetchChildFolders: (info?: unknown) => OsFolder[] | Promise<OsFolder[] | null | undefined> | null | undefined;
   onClick: (event: MouseEvent) => void;
 }) => {
-
   const currentPlatform = platform();
-
   return (
     <Transition
       appear={true}
@@ -37,16 +41,19 @@ const LibraryFolderCard = ({
     >
       <ContextMenu>
         <ContextMenuTrigger class="w-full flex justify-center items-center">
-          <div class="w-full h-52 min-h-30 cursor-pointer relative border-[1.5px] 
+          <div class={cn(`w-full h-52 min-h-30 cursor-pointer relative border-[1.5px] 
 						border-transparent rounded-sm shadow-black/20 shadow-md flex items-center 
-						justify-center overflow-hidden will-change-transform transition-all group"
+						justify-center overflow-hidden will-change-transform transition-all group`,
+            folder.is_hidden && "brightness-50"
+          )}
             onClick={onClick}
           >
             <div
               class="absolute inset-0 z-0"
               style={{
                 "background-image":
-                  `linear-gradient(rgba(0,0,0,.2),rgba(0,0,0,.2)),url(${folder.cover_img_path && convertFileSrc(folder.cover_img_path)})`,
+                  `linear-gradient(rgba(0,0,0,.2),rgba(0,0,0,.2)),
+									url(${folder.cover_img_path && convertFileSrc(folder.cover_img_path)})`,
                 "background-size": "cover",
                 "background-repeat": "no-repeat",
                 "background-position": "center",
@@ -67,8 +74,8 @@ const LibraryFolderCard = ({
             </div>
 
             {/* Hover Overlay for Extended Description */}
-            <div class="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity duration-200
-                        flex items-center justify-center text-white p-4 z-20">
+            <div class="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-all duration-200
+                        flex items-center justify-center text-white p-4 z-20 backdrop-blur-sm">
               <p class="text-sm font-medium absolute left-2 top-2 text text-zinc-100 bg-transparent 
 												 mix-blend-difference w-fit z-10 shadow-2xl rounded-none px-0.5">
                 {folder.title}
@@ -87,18 +94,33 @@ const LibraryFolderCard = ({
               </p>
             </div>
 
-            {/* folder.Title at Bottom */}
-            <div class="h-fit absolute left-0 bottom-0 bg-primary/80 font-medium 
-												border-t-4 border-t-secondary/10 shadow-md rounded-tr-sm 
-                        text-border text-xs p-1 mix-blend-plus-darker 
-												group-hover:opacity-0 transition-opacity duration-300"
+            {/* folder title */}
+            <div class="h-fit absolute left-0 top-0 bg-primary/80 font-medium 
+												border-b-4 border-b-secondary/10 shadow-sm shadow-black/50 rounded-br-sm 
+                        text-border text-xs p-1 backdrop-blur-sm mix-blend-plus-darker 
+												group-hover:opacity-0 transition-all duration-300 will-change-transform"
             >
               {folder.title}
             </div>
 
+            <Show when={folder.is_hidden}>
+              <div
+                class="group-hover:opacity-0 transition-all duration-300 
+								w-full h-full flex justify-center items-center absolute left-0 top-0 mix-blend-plus-lighter"
+              >
+                <IconHeroSlashEye class="h-2/3 
+									group-hover:opacity-0 transition-all duration-300 fill-secondary/80" />
+              </div>
+            </Show>
+
           </div>
         </ContextMenuTrigger>
-        <FolderCardContextMenuContent user={undefined} folder={folder} currentPlatform={currentPlatform} />
+        <FolderCardContextMenuContent
+          user={user}
+          folder={folder}
+          currentPlatform={currentPlatform}
+          refetch={refetchChildFolders}
+        />
       </ContextMenu>
     </Transition >
   );
