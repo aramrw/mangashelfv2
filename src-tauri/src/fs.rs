@@ -111,6 +111,26 @@ pub trait HasPath {
     fn path(&self) -> &str;
 }
 
+fn normalize_path(path: &str) -> String {
+    path.to_lowercase().replace('\\', "/") // Normalize case and separators.
+}
+
+#[allow(dead_code)]
+#[derive(Debug)]
+pub enum StaleEntries {
+    Found {
+        dirs: Option<HashSet<String>>,
+        panels: Option<HashSet<String>>,
+    },
+    None,
+}
+
+impl StaleEntries {
+    pub fn is_none(&self) -> bool {
+        matches!(self, StaleEntries::None)
+    }
+}
+
 fn find_missing_paths<'a, O, I>(old: &[O], new: I) -> Option<HashSet<String>>
 where
     O: HasPath,
@@ -134,26 +154,6 @@ where
         None
     } else {
         Some(missing)
-    }
-}
-
-fn normalize_path(path: &str) -> String {
-    path.to_lowercase().replace('\\', "/") // Normalize case and separators.
-}
-
-#[allow(dead_code)]
-#[derive(Debug)]
-pub enum StaleEntries {
-    Found {
-        dirs: Option<HashSet<String>>,
-        panels: Option<HashSet<String>>,
-    },
-    None,
-}
-
-impl StaleEntries {
-    pub fn is_none(&self) -> bool {
-        matches!(self, StaleEntries::None)
     }
 }
 
