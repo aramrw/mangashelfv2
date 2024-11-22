@@ -1,5 +1,5 @@
 import { useParams } from "@solidjs/router";
-import { Accessor, createEffect, createResource, createSignal, Show } from "solid-js";
+import { Accessor, createEffect, createResource, createSignal, ErrorBoundary, Show } from "solid-js";
 import get_os_folder_by_path from "../../tauri-cmds/mpv/get_os_folder_by_path";
 import ReaderNavbar from "./reader-nav";
 import get_user_by_id from "../../tauri-cmds/get_user_by_id";
@@ -7,25 +7,22 @@ import { get_panels } from "../../tauri-cmds/get_panels";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-solidjs";
 import { update_os_folders } from "../../tauri-cmds/os_folders";
-import { OsFolder } from "../../models";
+import { MangaPanel, OsFolder } from "../../models";
 import { Transition } from "solid-transition-group";
 import { cn } from "../../libs/cn";
 import upsert_read_os_dir from "../../tauri-cmds/handle_stale_folder";
 import ErrorAlert from "../../main-components/error-alert";
 import { platform } from "@tauri-apps/plugin-os";
+import img_err from "../../main-components/img/img_err.jpeg"
+import path_exists from "../../tauri-cmds/path_exists";
+
 
 export default function MangaReader() {
   const params = useParams();
   const currentPlatform = platform();
   const [folderPath, setFolderPath] = createSignal(decodeURIComponent(params.folder));
-  const [currentMangaFolder, { mutate: setCurrentMangaFolder }] = createResource(folderPath, async (folderPath) => {
-    try {
-      return await get_os_folder_by_path(folderPath);
-    } catch (error) {
-      SetError("FAILED TO LOAD PANELS:" + (error instanceof Error ? error : "Unknown error"));
-      return null; // return null or an empty object in case of an error
-    }
-  }); const [parentFolder] = createResource(() => (currentMangaFolder() ? currentMangaFolder()?.parent_path : null), get_os_folder_by_path);
+  const [currentMangaFolder, { mutate: setCurrentMangaFolder }] = createResource(folderPath, get_os_folder_by_path);
+  const [parentFolder] = createResource(() => (currentMangaFolder() ? currentMangaFolder()?.parent_path : null), get_os_folder_by_path);
   const [user] = createResource(() => (currentMangaFolder() ? currentMangaFolder()?.user_id : null), get_user_by_id);
 
   const [panels, { refetch: refetchPanels }] = createResource(() => (currentMangaFolder() ? currentMangaFolder()?.path : null), get_panels);
@@ -33,7 +30,6 @@ export default function MangaReader() {
   const [isDoublePanels, setIsDoublePanels] = createSignal(false);
   const [isfullyHydrated, setIsFullyHydrated] = createSignal(false)
   const [hasInitialized, setHasInitialized] = createSignal(false);
-  const [error, SetError] = createSignal<string | null>(null);
 
   createEffect(async () => {
     if (
@@ -204,8 +200,8 @@ export default function MangaReader() {
   };
 
   return (
-    <main class={cn("overflow-hidden relative h-[100dvh]",
-      currentPlatform === "macos" && "h-full"
+    <main class={cn("overflow-hidden relative h-[99dvh] pb-2",
+      currentPlatform === "macos" && "h-full pb-0"
     )}>
       <ReaderNavbar
         user={user}
@@ -224,163 +220,181 @@ export default function MangaReader() {
         handleNextSinglePanel={handleNextSinglePanel}
         handleNextPanel={handleNextPanel}
       />
-      <Show when={error()}>
-        <ErrorAlert error={error as Accessor<string>} />
-      </Show>
-      <Transition
-        appear={true}
-        onEnter={(el, done) => {
-          const a = el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 700 });
-          a.finished.then(done);
-        }}
-        onExit={(el, done) => {
-          const a = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 600 });
-          a.finished.then(done);
-        }}
-      >
-        <Show when={currentMangaFolder.state === "ready"}>
-          <Show when={panels.state === "ready" && user.state === "ready"}>
-            <div class="h-full w-full flex justify-center items-center">
-              <div
-                class={cn("h-[95%] w-1/4 z-20 absolute left-0 flex items-center cursor-pointer justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30",
-                  //currentPlatform === "macos" && "h-[90.5%]"
-                )}
-                onClick={async () => {
-                  if (isDoublePanels()) {
-                    await handleNextPanel();
-                  } else {
-                    await handleNextSinglePanel();
-                  }
-                }}
-              >
-                <IconChevronLeft class="h-20 md:h-28 w-auto bg-primary/10 pr-1 text-primary/50 " />
-              </div>
-              <div
-                class={cn("h-[95%] w-1/4 z-20 absolute right-0 flex items-center cursor-pointer justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30",
-                  //currentPlatform === "macos" && "h-[90.5%]"
-                )}
-                onClick={async () => {
-                  if (isDoublePanels()) {
-                    await handlePrevPanel();
-                  } else {
-                    await handlePrevSinglePanel();
-                  }
-                }}
-              >
-                <IconChevronRight class="h-20 md:h-28 w-auto bg-primary/10 pl-1 text-primary/50 " />
-              </div>
-              <h1
-                class="text-nowrap text-secondary rounded-b-sm hover:shadow-md hover:shadow-primary/15
+      <ErrorBoundary fallback={
+        (err, reset) => <ErrorAlert error={err.toString()} onClick={reset} />
+      }>
+
+        <Transition
+          appear={true}
+          onEnter={(el, done) => {
+            const a = el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 700 });
+            a.finished.then(done);
+          }}
+          onExit={(el, done) => {
+            const a = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 600 });
+            a.finished.then(done);
+          }}
+        >
+          <Show when={currentMangaFolder.state === "ready"}>
+            <Show when={panels.state === "ready" && user.state === "ready"}>
+              <div class="h-full w-full flex justify-center items-center pt-0.5">
+                <div
+                  class={cn("h-[97.1%] w-1/4 z-20 absolute left-0 flex items-center cursor-pointer justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30",
+                    currentPlatform === "macos" && "h-full"
+                  )}
+                  onClick={async () => {
+                    if (isDoublePanels()) {
+                      await handleNextPanel();
+                    } else {
+                      await handleNextSinglePanel();
+                    }
+                  }}
+                >
+                  <IconChevronLeft class="h-20 md:h-28 w-auto bg-primary/10 pr-1 text-primary/50 " />
+                </div>
+                <div
+                  class={cn("h-[97.1%] w-1/4 z-20 absolute right-0 flex items-center cursor-pointer justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30",
+                    currentPlatform === "macos" && "h-full"
+                  )}
+                  onClick={async () => {
+                    if (isDoublePanels()) {
+                      await handlePrevPanel();
+                    } else {
+                      await handlePrevSinglePanel();
+                    }
+                  }}
+                >
+                  <IconChevronRight class="h-20 md:h-28 w-auto bg-primary/10 pl-1 text-primary/50 " />
+                </div>
+                <h1
+                  class="text-nowrap text-secondary rounded-b-sm hover:shadow-md hover:shadow-primary/50
 								select-none font-medium px-3 z-50 h-fit pb-0.5 opacity-0 cursor-default
 								hover:opacity-100 hover:bg-primary transition-all duration-300"
-                style={{
-                  position: "absolute",
-                  top: "29px",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                }}
-              >
-                {currentMangaFolder()?.title}
-              </h1>
+                  style={{
+                    position: "absolute",
+                    top: "43px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                  }}
+                >
+                  {currentMangaFolder()?.title}
+                </h1>
 
-              <div class="relative flex flex-row justify-center items-center"
-              >
-                {/* Previous Panels - Absolute positioned, opacity 0.01 */}
-                <Show when={PREV_PANELS().first && PREV_PANELS().second && panelIndex() - 2 >= 1}>
-                  <div class="absolute left-0 top-0 flex transition-opacity duration-0" style={{ opacity: 0.01 }}>
-                    {/* Left panel (shown only in double panel mode) */}
-                    <Show when={isDoublePanels()}>
-                      <img
-                        src={convertFileSrc(PREV_PANELS().second?.path!)}
-                        alt={PREV_PANELS().second?.title}
-                        class="select-none 
-												bg-black object-contain max-h-[calc(100vh-37px)] max-w-[calc(100vw-50px)]"
+                <div class="relative flex flex-row justify-center items-center"
+                >
+                  {/* Previous Panels - Absolute positioned, opacity 0.01 */}
+                  <Show when={PREV_PANELS().first && PREV_PANELS().second && panelIndex() - 2 >= 1}>
+                    <Show when={panelIndex() + 1 <= panels()!.length - 1}>
+                      <RenderImagePanels
+                        component={PREV_PANELS}
+                        className="select-none bg-black object-contain max-h-[calc(100vh-37px)] max-w-[calc((100vw-10px)/2)]"
+                        isDoublePanels={isDoublePanels}
                       />
                     </Show>
-                    {/* Right panel (always shown) */}
-                    <img
-                      src={convertFileSrc(PREV_PANELS().first?.path!)}
-                      alt={PREV_PANELS().first?.title}
-                      class="select-none 
-											bg-black object-contain max-h-[calc(100vh-37px)] max-w-[calc(100vw-50px)]"
-                    />
-                  </div>
-                </Show>
-
-                {/* Current Panels - Visible */}
-                <div class="flex flex-row justify-center items-center w-full h-full">
-                  {/* Left panel (shown only in double panel mode) */}
-                  <Show when={isDoublePanels() && panelIndex() + 1 <= panels()!.length - 1}>
-                    <img
-                      src={convertFileSrc(CURRENT_PANELS().second?.path!)}
-                      alt={CURRENT_PANELS().second?.title}
-                      class="select-none 
-											 bg-black 
-											 object-contain max-h-[calc(100vh-37px)] 
-											 max-w-[calc((100vw-10px)/2)] 
-											 shadow-[-10px_0_20px_-14px_rgba(0,0,0,0.6)]"  // Shadow only on the outer left
-                    />
                   </Show>
 
-                  {/* Right panel (always shown) */}
-                  <img
-                    src={convertFileSrc(CURRENT_PANELS().first?.path!)}
-                    alt={CURRENT_PANELS().first?.title}
-                    class={cn(
-										`select-none 
-										 bg-black 
-										 object-contain max-h-[calc(100vh-37px)] 
-										 max-w-[calc((100vw-10px)/2)]`,
-									isDoublePanels()
-										? "shadow-[10px_0_20px_-14px_rgba(0,0,0,0.6)]" 
-										: "max-w-[calc((100vw-10px))] shadow-[0_0_20px_-10px_rgba(0,0,0,0.6)]" 
-                    )}
-                  />
-                </div>
-
-                {/* Next Panels - Absolute positioned, opacity 0.01 */}
-                <Show when={panelIndex() + 1 <= panels()!.length - 1}>
-                  <div class="absolute left-0 top-0 flex transition-opacity duration-0" style={{ opacity: 0.01 }}>
+                  {/* Current Panels - Visible */}
+                  <div class="flex flex-row justify-center items-center w-full h-full">
                     {/* Left panel (shown only in double panel mode) */}
-                    <Show when={isDoublePanels()}>
+                    <Show when={isDoublePanels() && panelIndex() + 1 <= panels()!.length - 1}>
                       <img
-                        src={convertFileSrc(NEXT_PANELS().second?.path!)}
-                        alt={NEXT_PANELS().second?.title}
+                        src={convertFileSrc(CURRENT_PANELS().second?.path!)}
+                        alt={CURRENT_PANELS().second?.title}
                         class="select-none 
-												bg-black 
-												object-contain max-h-[calc(100vh-37px)] max-w-[calc(100vw-50px)]"
+											 bg-black 
+											 object-contain 
+											 max-h-[calc(100vh-37px)] max-w-[calc((100vw-10px)/2)] 
+											 shadow-[-10px_0_20px_-14px_rgba(0,0,0,0.6)]"  // Shadow only on the outer left
                       />
                     </Show>
+
                     {/* Right panel (always shown) */}
                     <img
-                      src={convertFileSrc(NEXT_PANELS().first?.path!)}
-                      alt={NEXT_PANELS().first?.title}
-                      class="select-none 
-												bg-black 
-												object-contain max-h-[calc(100vh-37px)] max-w-[calc(100vw-50px)]"
-                    />
+                      src={convertFileSrc(CURRENT_PANELS().first?.path!)}
+                      alt={CURRENT_PANELS().first?.title}
+                      class={cn(
+                        `select-none 
+											 bg-black 
+											 object-contain max-h-[calc(100vh-37px)] 
+											 max-w-[calc((100vw-10px)/2)]`,
+                        isDoublePanels()
+                          ? "shadow-[10px_0_20px_-14px_rgba(0,0,0,0.6)]"
+                          : "max-w-[calc((100vw-10px))] shadow-[0_0_20px_-10px_rgba(0,0,0,0.6)]"
+                      )}
+                      onError={(e) => {
+                        e.preventDefault();
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = img_err;
+                      }} />
                   </div>
+
+                  {/* ALL Next Panels - Absolute positioned, opacity 0.01 */}
+                  <Show when={panelIndex() + 1 <= panels()!.length - 1}>
+                    <RenderImagePanels
+                      component={NEXT_PANELS}
+                      className="select-none bg-black object-contain max-h-[calc(100vh-37px)] max-w-[calc((100vw-10px)/2)]"
+                      isDoublePanels={isDoublePanels}
+                    />
+                  </Show>
+                </div>
+                <h2
+                  class="rounded-t-sm hover:shadow-md hover:shadow-primary 
+									select-none text-accent/35 font-medium px-3 hover:text-secondary hover:bg-primary transition-all duration-300"
+                  style={{
+                    position: "absolute",
+                    bottom: "0",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                  }}
+                >
+                  {panelIndex()}/{panels()?.length! - 1}
+                </h2>
+                <p class="text-sm select-none absolute right-0 bottom-0 text-muted font-medium px-3">{CURRENT_PANELS().first?.title}</p>
+                <Show when={isDoublePanels()}>
+                  <p class="text-sm select-none absolute left-0 bottom-0 text-muted font-medium px-3">{CURRENT_PANELS().second?.title}</p>
                 </Show>
               </div>
-              <h2
-                class="rounded-t-sm hover:shadow-md hover:shadow-primary select-none text-accent/35 font-medium px-3 hover:text-secondary hover:bg-primary transition-all duration-300"
-                style={{
-                  position: "absolute",
-                  bottom: "0",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                }}
-              >
-                {panelIndex()}/{panels()?.length! - 1}
-              </h2>
-              <p class="text-sm select-none absolute right-0 bottom-0 text-muted font-medium px-3">{CURRENT_PANELS().first?.title}</p>
-              <Show when={isDoublePanels()}>
-                <p class="text-sm select-none absolute left-0 bottom-0 text-muted font-medium px-3">{CURRENT_PANELS().second?.title}</p>
-              </Show>
-            </div>
+            </Show>
           </Show>
-        </Show>
-      </Transition>
-    </main>
+        </Transition>
+      </ErrorBoundary>
+    </main >
   );
 }
+
+type PanelComponent = {
+  first: MangaPanel | undefined;
+  second: MangaPanel | null | undefined;
+}
+
+
+const RenderImagePanels = ({
+  component,
+  className,
+  isDoublePanels
+}: {
+  component: () => PanelComponent
+  className: string | undefined;
+  isDoublePanels: Accessor<boolean>;
+}) => {
+  return (
+    <div class="absolute left-0 top-0 flex flex-row transition-opacity duration-0" style={{ opacity: 0.01 }}>
+      {/* Left panel (SECOND; shown only in double panel mode) */}
+      <Show when={isDoublePanels()}>
+        <img
+          src={convertFileSrc(component().second?.path!)}
+          alt={component().second?.title}
+          class={className}
+        />
+      </Show>
+      {/* Right panel (FIRST; always shown) */}
+      <img
+        src={convertFileSrc(component().first?.path!)}
+        alt={component().first?.title}
+        class={className}
+      />
+    </div>
+
+  );
+};
+
