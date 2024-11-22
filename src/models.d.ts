@@ -27,6 +27,7 @@ export type OsFolder = {
   is_manga_folder: boolean;
   is_double_panels: boolean;
   zoom: number;
+	is_hidden: boolean;
   update_date: string;
   update_time: string;
 }
