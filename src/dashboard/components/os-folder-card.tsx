@@ -6,6 +6,7 @@ import { platform } from "@tauri-apps/plugin-os";
 import FolderCardContextMenuContent from "./folder-card-cm-context";
 import { useNavigate } from "@solidjs/router";
 import { Transition } from "solid-transition-group";
+import { cn } from "../../libs/cn";
 
 const OsFolderCard = ({
   folder,
@@ -19,8 +20,6 @@ const OsFolderCard = ({
   const currentPlatform = platform();
   const encodedFolderPath = encodeURIComponent(folder.path);
   const navigate = useNavigate();
-
-  //console.log(folder)
 
   return (
     <Transition
@@ -41,20 +40,19 @@ const OsFolderCard = ({
       <ContextMenu>
         <ContextMenuTrigger>
           <div
-            class=" w-fit
-					flex items-center
-					hover:translate-y-[-1.5px] transition-all
-						cursor-pointer duration-200 ease-in-out select-none"
+            class={cn("w-fit flex items-center hover:translate-y-[-1.5px] transition-all cursor-pointer duration-200 ease-in-out select-none",
+              folder.is_hidden && "brightness-75"
+            )}
           >
             <div
               class="
-							h-32 w-24 
-							sm:h-44 sm:w-32 
-							md:h-48 md:w-36 
-							lg:h-64 lg:w-48
-							xl:h-80 xl:w-56 
-							rounded-sm shadow-md bg-white
-							flex items-center justify-center overflow-hidden relative will-change-transfor"
+									h-32 w-24 
+									sm:h-44 sm:w-32 
+									md:h-48 md:w-36 
+									lg:h-64 lg:w-48
+									xl:h-80 xl:w-56 
+									rounded-sm shadow-md bg-white 
+									flex items-center justify-center overflow-hidden relative will-change-transfor"
               onClick={() => {
                 if (folder.is_manga_folder) {
                   navigate(`/reader/${encodedFolderPath}`);
@@ -65,7 +63,12 @@ const OsFolderCard = ({
             >
               <div class="h-full w-full folder-card-container relative inset-0 z-10">
                 <Show when={folder.cover_img_path}>
-                  <img src={convertFileSrc(folder.cover_img_path!)} class="object-fill w-full h-full relative z-10 bg-black will-change-transform" />
+                  <img
+                    src={convertFileSrc(folder.cover_img_path!)}
+                    class={cn("object-fill w-full h-full relative z-10 bg-black will-change-transform",
+										folder.is_hidden && "blur-[10px]"
+										)} 
+									/>
                 </Show>
               </div>
               <Show when={!folder.cover_img_path}>
