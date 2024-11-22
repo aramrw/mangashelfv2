@@ -12,9 +12,8 @@ import { Transition } from "solid-transition-group";
 import { cn } from "../../libs/cn";
 import upsert_read_os_dir from "../../tauri-cmds/handle_stale_folder";
 import ErrorAlert from "../../main-components/error-alert";
-import { platform } from "@tauri-apps/plugin-os";
+import { Platform, platform } from "@tauri-apps/plugin-os";
 import img_err from "../../main-components/img/img_err.jpeg"
-import path_exists from "../../tauri-cmds/path_exists";
 
 
 export default function MangaReader() {
@@ -113,8 +112,9 @@ export default function MangaReader() {
   };
 
   async function handleSetDoublePanels() {
-    setIsDoublePanels((prev) => !prev);
-    if (currentMangaFolder.state === "ready" && user.state === "ready") {
+    // Check if you are NOT on the last panel
+    if (currentMangaFolder() && user() && panels() && panelIndex() < panels()?.length! - 1) {
+      setIsDoublePanels((prev) => !prev);
       let newFolder = structuredClone(currentMangaFolder());
       if (newFolder) {
         newFolder.is_double_panels = isDoublePanels();
@@ -168,33 +168,31 @@ export default function MangaReader() {
   };
 
   const handleNextPanel = async () => {
-    if (panels.state === "ready" && panelIndex() + 2 <= panels()!.length - 1) {
-      setPanelIndex((prev) => prev + 2);
+    if (panels()) {
+      setPanelIndex(Math.min(panelIndex() + 2, panels()?.length! - 1));
       await handleUpdateFolders();
     }
   };
 
   const handleNextSinglePanel = async () => {
-    if (panels.state === "ready" && panelIndex() + 1 <= panels()!.length - 1) {
-      setPanelIndex((prev) => prev + 1);
+    if (panels()) {
+      setPanelIndex(Math.min(panelIndex() + 1, panels()?.length! - 1))
       await handleUpdateFolders();
     }
   };
 
   const handlePrevPanel = async () => {
-    if (panels.state === "ready") {
+    if (panels()) {
       // Decrease by 2, but ensure it doesn't go below 0
-      const newIndex = Math.max(panelIndex() - 2, 0);
-      setPanelIndex(newIndex);
+      setPanelIndex(Math.max(panelIndex() - 2, 0));
     }
     await handleUpdateFolders();
   };
 
   const handlePrevSinglePanel = async () => {
-    if (panels.state === "ready") {
+    if (panels()) {
       // Decrease by 1, but ensure it doesn't go below 0
-      const newIndex = Math.max(panelIndex() - 1, 0);
-      setPanelIndex(newIndex);
+      setPanelIndex(Math.max(panelIndex() - 1, 0));
     }
     await handleUpdateFolders();
   };
@@ -238,34 +236,14 @@ export default function MangaReader() {
           <Show when={currentMangaFolder.state === "ready"}>
             <Show when={panels.state === "ready" && user.state === "ready"}>
               <div class="h-full w-full flex justify-center items-center pt-0.5">
-                <div
-                  class={cn("h-[97.1%] w-1/4 z-20 absolute left-0 flex items-center cursor-pointer justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30",
-                    currentPlatform === "macos" && "h-full"
-                  )}
-                  onClick={async () => {
-                    if (isDoublePanels()) {
-                      await handleNextPanel();
-                    } else {
-                      await handleNextSinglePanel();
-                    }
-                  }}
-                >
-                  <IconChevronLeft class="h-20 md:h-28 w-auto bg-primary/10 pr-1 text-primary/50 " />
-                </div>
-                <div
-                  class={cn("h-[97.1%] w-1/4 z-20 absolute right-0 flex items-center cursor-pointer justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30",
-                    currentPlatform === "macos" && "h-full"
-                  )}
-                  onClick={async () => {
-                    if (isDoublePanels()) {
-                      await handlePrevPanel();
-                    } else {
-                      await handlePrevSinglePanel();
-                    }
-                  }}
-                >
-                  <IconChevronRight class="h-20 md:h-28 w-auto bg-primary/10 pl-1 text-primary/50 " />
-                </div>
+                <NavigationButtons
+                  currentPlatform={currentPlatform}
+                  isDoublePanels={isDoublePanels}
+                  handleNextPanel={handleNextPanel}
+                  handlePrevPanel={handlePrevPanel}
+                  handleNextSinglePanel={handleNextSinglePanel}
+                  handlePrevSinglePanel={handlePrevSinglePanel}
+                />
                 <h1
                   class="text-nowrap text-secondary rounded-b-sm hover:shadow-md hover:shadow-primary/50
 								select-none font-medium px-3 z-50 h-fit pb-0.5 opacity-0 cursor-default
@@ -362,11 +340,64 @@ export default function MangaReader() {
   );
 }
 
+interface NavigationButtonsProps {
+  currentPlatform: Platform;
+  isDoublePanels: () => boolean;
+  handleNextPanel: () => Promise<void>;
+  handlePrevPanel: () => Promise<void>;
+  handleNextSinglePanel: () => Promise<void>;
+  handlePrevSinglePanel: () => Promise<void>;
+}
+
+const NavigationButtons = ({
+  currentPlatform,
+  isDoublePanels,
+  handleNextPanel,
+  handlePrevPanel,
+  handleNextSinglePanel,
+  handlePrevSinglePanel,
+}: NavigationButtonsProps) => (
+  <>
+    {/* Left Button */}
+    <div
+      class={cn(
+        "h-[97.1%] w-1/4 z-20 absolute left-0 flex items-center cursor-pointer justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30",
+        currentPlatform === "macos" && "h-full"
+      )}
+      onClick={async () => {
+        if (isDoublePanels()) {
+          await handleNextPanel();
+        } else {
+          await handleNextSinglePanel();
+        }
+      }}
+    >
+      <IconChevronLeft class="h-20 md:h-32 lg:h-40 xl:h-56 w-auto bg-primary/10 pl-1 text-primary/50 " />
+    </div>
+
+    {/* Right Button */}
+    <div
+      class={cn(
+        "h-[97.1%] w-1/4 z-20 absolute right-0 flex items-center cursor-pointer justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30",
+        currentPlatform === "macos" && "h-full"
+      )}
+      onClick={async () => {
+        if (isDoublePanels()) {
+          await handlePrevPanel();
+        } else {
+          await handlePrevSinglePanel();
+        }
+      }}
+    >
+      <IconChevronRight class="h-20 md:h-32 lg:h-40 xl:h-56 w-auto bg-primary/10 pl-1 text-primary/50 " />
+    </div>
+  </>
+);
+
 type PanelComponent = {
   first: MangaPanel | undefined;
   second: MangaPanel | null | undefined;
 }
-
 
 const RenderImagePanels = ({
   component,
