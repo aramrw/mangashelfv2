@@ -157,6 +157,45 @@ where
     }
 }
 
+fn find_stale_metadata(
+    old: &[MangaPanel],
+    new: &HashSet<String>, // new is directly a HashSet<String>
+) -> Option<HashSet<String>> {
+    // Build a map of old panels for easy lookup by path.
+    let old_map: HashMap<&str, &MangaPanel> = old.iter().map(|p| (p.path.as_str(), p)).collect();
+
+    // Start with an empty set to store stale or missing paths.
+    let mut result: HashSet<String> = HashSet::new();
+
+    // Iterate over new panel paths to check both missing and stale metadata.
+    new.iter().for_each(|new_path| {
+        // Check if the panel exists in the old set.
+        if let Some(old_panel) = old_map.get(new_path.as_str()) {
+            // Check if the panel's metadata is stale.
+            if old_panel.is_stale_metadata() {
+                result.insert(new_path.clone()); // Add to result if metadata is stale.
+            }
+        } else {
+            result.insert(new_path.clone()); // Add missing panel to result (panel was deleted).
+        }
+    });
+
+    // Also check for any panels that were in `old` but not in `new` (deleted panels).
+    old.iter().for_each(|old_panel| {
+        // If a panel in `old` is missing from `new`, consider it missing.
+        if !new.contains(old_panel.path()) {
+            result.insert(old_panel.path().to_string());
+        }
+    });
+
+    // Return the result if not empty, otherwise None.
+    if result.is_empty() {
+        None
+    } else {
+        Some(result)
+    }
+}
+
 fn find_stale_entries(
     main_dir: &str,
     old_dirs: Option<&[OsFolder]>,
@@ -173,7 +212,7 @@ fn find_stale_entries(
 
     // Compare old and new entries to determine which are stale.
     let dirs = find_missing_paths(old_dirs, new_dirs.iter());
-    let panels = find_missing_paths(old_panels, new_panels.iter());
+    let panels = find_stale_metadata(old_panels, &new_panels);
 
     // If no new entries are found, return `None`. Otherwise, return the found entries.
     match (&dirs, &panels) {
