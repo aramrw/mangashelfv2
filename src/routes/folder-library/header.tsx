@@ -1,25 +1,21 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { createResource, Resource, Show } from "solid-js";
+import { Resource, Show } from "solid-js";
 import { OsFolder, UserType } from "../../models";
-import get_os_folder_by_path from "../../tauri-cmds/mpv/get_os_folder_by_path";
 import { useNavigate } from "@solidjs/router";
-import { IconBook, IconBookFilled } from "@tabler/icons-solidjs";
+import { IconBookFilled } from "@tabler/icons-solidjs";
 import { cn } from "../../libs/cn";
 
 export default function ({
   mainParentFolder,
-  user
+  user,
+  lastReadMangaFolder
 }: {
-  mainParentFolder: Resource<OsFolder | null>,
-  user: Resource<UserType | null>
+  mainParentFolder: Resource<OsFolder | null>;
+  user: Resource<UserType | null>;
+  lastReadMangaFolder: Resource<OsFolder | null>;
 }) {
 
   const navigate = useNavigate();
-  const FILE_SRC_LWV_COVER_IMG_PATH = convertFileSrc(mainParentFolder()?.cover_img_path!);
-  const [lastReadMangaFolder] = createResource(
-    () => mainParentFolder()?.last_read_panel ? mainParentFolder()?.last_read_panel?.parent_path : null,
-    get_os_folder_by_path
-  );
 
   return (
     <header class="sm:px-2 md:px-16 lg:px-30 xl:px-40 w-full h-fit py-3 px-2 relative">
@@ -28,7 +24,7 @@ export default function ({
           class="absolute inset-0 z-0"
           style={{
             "background-image":
-              `linear-gradient(rgba(0,0,0,.2),rgba(0,0,0,.2)),url(${FILE_SRC_LWV_COVER_IMG_PATH})`,
+              `linear-gradient(rgba(0,0,0,.2),rgba(0,0,0,.2)),url(${convertFileSrc(mainParentFolder()?.cover_img_path!)})`,
             "background-size": "cover",
             "background-repeat": "no-repeat",
             "background-position": "center",
@@ -52,8 +48,8 @@ export default function ({
       </div>
       <Show when={mainParentFolder()?.title && mainParentFolder()?.cover_img_path}>
         <div class={cn("relative w-fit flex items-start gap-2 group",
-					mainParentFolder()?.last_read_panel && "cursor-pointer"
-				)}
+          mainParentFolder()?.last_read_panel && "cursor-pointer"
+        )}
           onClick={() => {
             if (mainParentFolder()?.last_read_panel) {
               navigate(`/reader/${encodeURIComponent(lastReadMangaFolder()?.path!)}`)
@@ -62,17 +58,18 @@ export default function ({
         >
           <img
             alt={mainParentFolder()?.title}
+						onError={() => {}}
             src={mainParentFolder()?.last_read_panel?.path
               ? convertFileSrc(mainParentFolder()?.last_read_panel?.path!)
-              : FILE_SRC_LWV_COVER_IMG_PATH}
+              : convertFileSrc(mainParentFolder()?.cover_img_path!)}
             class="select-none h-72 md:h-[320px] object-contain lg:h-[400px] 
               w-auto z-30 rounded-none bg-black 
               border-transparent border-2 shadow-md"
           />
           <Show when={mainParentFolder()?.last_read_panel?.path && lastReadMangaFolder()}>
             <IconBookFilled
-              class="text-secondary fill-secondary bg-primary/80 rounded-sm hover:opacity-50 transition-all
-              cursor-pointer h-auto w-[40%] p-1 mix-blend-luminosity absolute z-50 shadow-md shadow-primary/20"
+              class="text-secondary fill-secondary bg-primary/80 rounded-sm group-hover:opacity-0 transition-opacity duration-300
+              cursor-pointer h-auto w-[40%] p-1 absolute z-50 shadow-md shadow-primary/20"
               style={{
                 top: '50%',
                 left: '50%',
@@ -80,7 +77,7 @@ export default function ({
               }}
             />
             {/* Hover Overlay for Extended Description */}
-            <div class="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity duration-200
+            <div class="absolute inset-0 bg-black/90 opacity-0 group-hover:opacity-100 transition-opacity duration-200
                         flex items-center justify-center text-white p-4 z-50">
               <p class="text-sm font-medium absolute left-2 top-2 text text-zinc-100 bg-transparent 
 												 mix-blend-difference w-fit z-10 shadow-2xl rounded-none px-0.5">
