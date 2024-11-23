@@ -5,6 +5,10 @@ import { useNavigate } from "@solidjs/router";
 import { IconBookFilled } from "@tabler/icons-solidjs";
 import { cn } from "../../libs/cn";
 
+export function escapeCSSUrl(url: string) {
+  return url.replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+}
+
 export default function ({
   mainParentFolder,
   user,
@@ -17,17 +21,18 @@ export default function ({
 
   const navigate = useNavigate();
 
+
   return (
     <header class="sm:px-2 md:px-16 lg:px-30 xl:px-40 w-full h-fit py-3 px-2 relative">
-      <Show when={mainParentFolder}>
+      <Show when={mainParentFolder() && mainParentFolder()?.cover_img_path}>
         <div
           class="absolute inset-0 z-0"
           style={{
-            "background-image":
-              `linear-gradient(rgba(0,0,0,.2),rgba(0,0,0,.2)),url(${convertFileSrc(mainParentFolder()?.cover_img_path!)})`,
+            "background-image": `linear-gradient(rgba(0,0,0,.2),rgba(0,0,0,.2)),
+						url(${mainParentFolder()?.last_read_panel ? escapeCSSUrl(convertFileSrc(mainParentFolder()?.last_read_panel?.path!)) : escapeCSSUrl(convertFileSrc(mainParentFolder()?.cover_img_path!))})`,
             "background-size": "cover",
             "background-repeat": "no-repeat",
-            "background-position": "center",
+            "background-position": "start",
             filter: "blur(6px)",
           }}
         />
@@ -58,7 +63,7 @@ export default function ({
         >
           <img
             alt={mainParentFolder()?.title}
-						onError={() => {}}
+            onError={() => { }}
             src={mainParentFolder()?.last_read_panel?.path
               ? convertFileSrc(mainParentFolder()?.last_read_panel?.path!)
               : convertFileSrc(mainParentFolder()?.cover_img_path!)}
