@@ -7,6 +7,7 @@ import FolderCardContextMenuContent from "./folder-card-cm-context";
 import { useNavigate } from "@solidjs/router";
 import { Transition } from "solid-transition-group";
 import { cn } from "../../libs/cn";
+import { FolderDescription } from "../../routes/folder-library/folder-card";
 
 const OsFolderCard = ({
   folder,
@@ -40,7 +41,9 @@ const OsFolderCard = ({
       <ContextMenu>
         <ContextMenuTrigger>
           <div
-            class={cn("w-fit flex items-center hover:translate-y-[-1.5px] transition-all cursor-pointer duration-200 ease-in-out select-none",
+            class={cn(`group w-fit flex items-center 
+						transition-all duration-200 ease-in-out
+						cursor-pointer select-none will-change-auto`,
               folder.is_hidden && "brightness-75"
             )}
           >
@@ -66,19 +69,22 @@ const OsFolderCard = ({
                   <img
                     src={convertFileSrc(folder.cover_img_path!)}
                     class={cn("object-fill w-full h-full relative z-10 bg-black will-change-transform",
-										folder.is_hidden && "blur-[10px]"
-										)} 
-									/>
+                      folder.is_hidden && "blur-[10px]"
+                    )}
+                  />
                 </Show>
               </div>
               <Show when={!folder.cover_img_path}>
                 <span
                   class="text-white mix-blend-multiply px-2 text-sm font-medium
-														 whitespace-nowrap overflow-hidden relative z-10"
+									whitespace-nowrap overflow-hidden relative z-10"
                 >
                   {folder.title}
                 </span>
               </Show>
+              <FolderDescription
+                folder={() => folder}
+              />
             </div>
           </div>
         </ContextMenuTrigger>
