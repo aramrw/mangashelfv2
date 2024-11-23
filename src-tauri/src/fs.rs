@@ -298,6 +298,14 @@ pub fn read_os_folder_dir(
     let mut panel_paths = HashSet::new();
     read_dir_helper(&path, &mut childfolder_paths, &mut panel_paths)?;
 
+    let parent_path = parent_path.is_some().then(|| {
+        Path::new(&path)
+            .parent()
+            .unwrap()
+            .to_string_lossy()
+            .to_string()
+    });
+
     if childfolder_paths.is_empty() && panel_paths.is_empty() {
         return Err(ReadDirError::IoError(io::Error::new(
             io::ErrorKind::NotFound,
@@ -356,7 +364,10 @@ pub fn read_os_folder_dir(
     });
 
     let first_panel = total_panels.first().cloned();
-    let mut cover_img = first_panel.as_ref().map(|p| p.path.clone());
+    //println!("first_panel: {:?}", first_panel); // Debug statement
+    let mut cover_img = first_panel
+        .as_ref()
+        .map(|p| normalize_path(&p.path.clone()));
 
     let child_folders_group: Vec<FolderGroup> = childfolder_paths
         .into_par_iter()
