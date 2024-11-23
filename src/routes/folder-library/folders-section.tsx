@@ -31,10 +31,10 @@ export default function LibraryFoldersSection({
     <>
       <section
         class="md:px-4 overflow-hidden w-full h-fit px-2 pb-4 relative 
-				border-b-white border-b-2 shadow-lg shadow-primary/10">
+				border-b-white border-b-2 shadow-lg shadow-primary/10 will-change-auto">
         <ul
           class="mx-auto h-fit w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 
-					xl:grid-cols-4 gap-3 lg:px-32 place-items-center">
+					xl:grid-cols-4 gap-3 lg:px-12 place-items-center">
           <For each={childFolders()}>
             {(folder, index) => (
               <>
@@ -71,7 +71,7 @@ export default function LibraryFoldersSection({
   )
 }
 
-function FolderCardRenderer(props: {
+export function FolderCardRenderer(props: {
   folder: OsFolder;
   user: Resource<UserType | null>;
   index: Accessor<number>;
