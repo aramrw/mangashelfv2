@@ -1,5 +1,5 @@
-import { OsFolder, UserType, } from "../../models";
-import { Accessor, Resource, Show } from "solid-js";
+import { MangaPanel, OsFolder, UserType, } from "../../models";
+import { Accessor, Component, Resource, Show } from "solid-js";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import {
   ContextMenu,
@@ -42,25 +42,25 @@ const LibraryFolderCard = ({
     >
       <ContextMenu>
         <ContextMenuTrigger class="w-full flex justify-center items-center">
-          <div class={cn(`w-full h-52 min-h-30 cursor-pointer relative border-[1.5px] 
+          <div class={cn(`w-full h-52 lg:h-64 min-h-30 cursor-pointer relative border-[1.5px] 
 						border-transparent rounded-sm shadow-black/20 shadow-md flex items-center 
-						justify-center overflow-hidden will-change-transform transition-all group`,
+						justify-center overflow-hidden will-change-auto transition-all group`,
             folder.is_hidden && "brightness-50"
           )}
             onClick={onClick}
           >
-									{/*    <div */}
-									{/*      class="absolute inset-0 z-0" */}
-									{/*      style={{ */}
-									{/*        "background-image": */}
-									{/*          `linear-gradient(rgba(0,0,0,.2),rgba(0,0,0,.2)), */}
-									{/* url(${folder.cover_img_path && escapeCSSUrl(convertFileSrc(folder.cover_img_path))})`, */}
-									{/*        "background-size": "cover", */}
-									{/*        "background-repeat": "no-repeat", */}
-									{/*        "background-position": "center", */}
-									{/*        filter: "blur(2px)", */}
-									{/*      }} */}
-									{/*    /> */}
+            {/*    <div */}
+            {/*      class="absolute inset-0 z-0" */}
+            {/*      style={{ */}
+            {/*        "background-image": */}
+            {/*          `linear-gradient(rgba(0,0,0,.2),rgba(0,0,0,.2)), */}
+            {/* url(${folder.cover_img_path && escapeCSSUrl(convertFileSrc(folder.cover_img_path))})`, */}
+            {/*        "background-size": "cover", */}
+            {/*        "background-repeat": "no-repeat", */}
+            {/*        "background-position": "center", */}
+            {/*        filter: "blur(2px)", */}
+            {/*      }} */}
+            {/*    /> */}
 
             {/* <div class="w-7 h-7 bg-secondary absolute left-0 top-0 z-20 rounded-br-sm" /> */}
             {/* Folder Image */}
@@ -71,36 +71,18 @@ const LibraryFolderCard = ({
               />
             </Show>
 
-            {/* Hover Overlay for Extended Description */}
-            <div class="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-all duration-200
-                        flex items-center justify-center text-white p-4 z-20 backdrop-blur-sm">
-              <p class="text-sm font-medium absolute left-2 top-2 text text-zinc-100 bg-transparent 
-												 mix-blend-difference w-fit z-10 shadow-2xl rounded-none px-0.5">
-                {folder.title}
-              </p>
-              <p class="text-[13px] font-medium absolute left-2 top-7 text text-zinc-300 bg-transparent 
-												 mix-blend-difference w-fit z-10 shadow-2xl rounded-none px-0.5">
-                {folder.last_read_panel?.title}
-              </p>
-              <p class="text-[12px] font-medium absolute right-2 bottom-2 text text-zinc-300 bg-transparent 
-												mix-blend-difference w-fit z-10 shadow-2xl rounded-none px-0.5">
-                {folder.update_date}
-              </p>
-              <p class="text-[13px] font-medium absolute right-2 bottom-6 text text-zinc-300 bg-transparent 
-												mix-blend-difference w-fit z-10 shadow-2xl rounded-none px-0.5">
-                {folder.update_time}
-              </p>
-            </div>
+            <FolderDescription
+              folder={() => folder}
+            />
 
             {/* folder title */}
-            <div class="h-fit absolute left-0 top-0 bg-primary/80 font-medium 
-												border-b-4 border-b-secondary/10 shadow-sm shadow-black/50 rounded-br-sm 
-                        text-border text-xs p-1 backdrop-blur-sm mix-blend-plus-darker 
-												group-hover:opacity-0 transition-all duration-300 will-change-transform"
-            >
+            <div class="w-fit h-full text-md lg:text-lg xl:text-xl absolute left-0 top-0 bg-primary/80 font-semibold 
+            border-r-4 border-r-secondary/10 shadow-sm shadow-black/50 text-nowrap
+            text-border p-1 pl-1.5 backdrop-blur-sm mix-blend-plus-darker 
+            group-hover:opacity-90 transition-all duration-300 will-change-auto 
+            [writing-mode:vertical-rl] [text-orientation:upright]">
               {folder.title}
             </div>
-
             <Show when={folder.is_hidden}>
               <div
                 class="group-hover:opacity-0 transition-all duration-300 
@@ -123,6 +105,114 @@ const LibraryFolderCard = ({
     </Transition >
   );
 };
+
+interface FolderDescriptionProps {
+  folder: (() => OsFolder | null) | (() => MangaPanel | undefined);
+}
+
+export const FolderDescription: Component<FolderDescriptionProps> = (props) => {
+  const folder = props.folder();
+
+  // Check if the folder is an OsFolder by inspecting the last_read_panel or other properties unique to OsFolder
+  const isOsFolder = folder && 'last_read_panel' in folder;
+  const getTitle = (title: string | undefined): [string, string] => {
+    if (!title) return ['No Title', 'No File Type'];
+
+    const parts = title.split('.'); // Split by dots
+    // Get the file type (extension) — the last part after the last dot
+    const ft = parts.length > 1 ? parts.pop()! : 'No File Type';
+    // Join the remaining parts with spaces
+    const nTitle = parts.join(' ');
+    return [nTitle, ft];
+  };
+
+  const getTitlesFromPath = (title: string | undefined): [string, string] => {
+    if (!title) return ['No panel', 'No parent'];
+
+    // Split by both '/' and '\' using a regex
+    const parts = title.split(/[\\/]/);
+
+    // Get the file type (extension) — the part after the last dot
+    const panel = parts.pop();
+    const parent = parts.pop();
+    if (!panel || !parent) return ['No panel', 'No parent'];
+    else return [panel, parent]
+
+  };
+
+  const bytesToMB = (bytes: number): string => {
+    if (bytes <= 0) return "0 MB";
+    const mb = bytes / (1024 * 1024); // Convert bytes to MB
+    return `${mb.toFixed(2)}mb`; // Format to 2 decimal places
+  };
+
+  const title = getTitle(props.folder()?.title);
+
+  return (
+    <div class={cn(
+      "z-50 absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-all duration-200 flex flex-col items-start justify-between text-white px-2.5 py-1.5 backdrop-blur-sm w-full rounded-sm",
+      !isOsFolder && "p-3"
+    )}>
+      {/* OS Folder Section */}
+      <Show when={isOsFolder}>
+        <div>
+          <div class="flex flex-col">
+            <p class="text-md xl:text-xl font-semibold text-zinc-100 bg-transparent mix-blend-difference w-fit z-10 shadow-2xl rounded-none px-0.5">
+              {folder?.title}
+            </p>
+            <p class="text-[13px] font-medium text-zinc-300 bg-transparent mix-blend-difference w-fit z-10 shadow-2xl rounded-none px-0.5">
+              {(folder as OsFolder)?.last_read_panel?.title || "No Last Read Panel"}
+            </p>
+          </div>
+          <div class="absolute bottom-0 right-0 flex flex-col items-end m-2">
+            <p class="text-[12px] font-medium text-zinc-300 bg-transparent mix-blend-difference w-fit z-10 shadow-2xl rounded-none px-0.5 leading-tight">
+              {folder?.update_date}
+            </p>
+            <p class="text-[13px] font-medium text-zinc-300 bg-transparent mix-blend-difference w-fit z-10 shadow-2xl rounded-none px-0.5 leading-tight">
+              {folder?.update_time}
+            </p>
+          </div>
+        </div>
+      </Show>
+
+      {/* Manga Panel Section */}
+      <Show when={!isOsFolder}>
+        <div>
+          <p class="text-[13px] font-semibold text-zinc-300 bg-transparent 
+  mix-blend-difference w-fit z-10 shadow-2xl rounded-none px-0.5 leading-none truncate">
+            {getTitlesFromPath(folder?.parent_path)[0]}
+          </p>
+          <div class="flex flex-row">
+            <p class="text-xl font-semibold text-zinc-100 bg-transparent 
+							mix-blend-difference w-fit z-10 shadow-2xl rounded-none px-0.5 underline">
+
+              {title[0]}
+            </p>
+            <p class="text-[13px] font-medium text-zinc-300 bg-transparent 
+							mix-blend-difference w-fit z-10 shadow-2xl rounded-none px-0.5">
+              .{title[1]}
+            </p>
+          </div>
+          <div class="absolute bottom-0 right-0 flex flex-col items-end m-2">
+            <p class="text-[12px] font-medium text-zinc-300 bg-transparent 
+							mix-blend-difference w-fit z-10 shadow-2xl rounded-none px-0.5 leading-tight">
+              {folder?.update_date}
+            </p>
+            <p class="text-[13px] font-medium text-zinc-300 bg-transparent 
+							mix-blend-difference w-fit z-10 shadow-2xl rounded-none px-0.5 leading-tight">
+              {folder?.update_time}
+            </p>
+          </div>
+          <p class="text-[13px] font-medium text-zinc-300 bg-transparent 
+						mix-blend-difference w-fit z-10 shadow-2xl rounded-none px-0.5 mt-2">
+            {bytesToMB((folder as MangaPanel).metadata.size)}
+          </p>
+        </div>
+      </Show>
+    </div>
+  );
+};
+
 
 export default LibraryFolderCard;
 
