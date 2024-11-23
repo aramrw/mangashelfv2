@@ -10,6 +10,7 @@ import FolderCardContextMenuContent from "../../dashboard/components/folder-card
 import { platform } from "@tauri-apps/plugin-os";
 import { cn } from "../../libs/cn";
 import IconHeroSlashEye from "../../main-components/icons/icon-hero-slash-eye";
+import { escapeCSSUrl } from "./header";
 
 const LibraryFolderCard = ({
   user,
@@ -48,30 +49,27 @@ const LibraryFolderCard = ({
           )}
             onClick={onClick}
           >
-            <div
-              class="absolute inset-0 z-0"
-              style={{
-                "background-image":
-                  `linear-gradient(rgba(0,0,0,.2),rgba(0,0,0,.2)),
-									url(${folder.cover_img_path && convertFileSrc(folder.cover_img_path)})`,
-                "background-size": "cover",
-                "background-repeat": "no-repeat",
-                "background-position": "center",
-                filter: "blur(2px)",
-              }}
-            />
+									{/*    <div */}
+									{/*      class="absolute inset-0 z-0" */}
+									{/*      style={{ */}
+									{/*        "background-image": */}
+									{/*          `linear-gradient(rgba(0,0,0,.2),rgba(0,0,0,.2)), */}
+									{/* url(${folder.cover_img_path && escapeCSSUrl(convertFileSrc(folder.cover_img_path))})`, */}
+									{/*        "background-size": "cover", */}
+									{/*        "background-repeat": "no-repeat", */}
+									{/*        "background-position": "center", */}
+									{/*        filter: "blur(2px)", */}
+									{/*      }} */}
+									{/*    /> */}
 
             {/* <div class="w-7 h-7 bg-secondary absolute left-0 top-0 z-20 rounded-br-sm" /> */}
             {/* Folder Image */}
-            <div class="folder-card-container inset-0"
-            >
-              <Show when={folder.cover_img_path}>
-                <img
-                  src={folder.cover_img_path && convertFileSrc(folder.cover_img_path)}
-                  class="object-cover w-full h-full relative select-none"
-                />
-              </Show>
-            </div>
+            <Show when={folder.cover_img_path}>
+              <img
+                src={folder.cover_img_path && convertFileSrc(folder.cover_img_path)}
+                class="object-cover w-full h-full relative select-none object-top"
+              />
+            </Show>
 
             {/* Hover Overlay for Extended Description */}
             <div class="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-all duration-200
