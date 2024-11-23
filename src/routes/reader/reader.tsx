@@ -198,8 +198,8 @@ export default function MangaReader() {
   };
 
   return (
-    <main class={cn("overflow-hidden relative h-[99dvh] pb-2",
-      currentPlatform === "macos" && "h-full pb-0"
+    <main class={cn("overflow-hidden flex flex-col justify-start relative h-[100dvh] pb-2 will-change-auto",
+      currentPlatform === "macos" && "h-full"
     )}>
       <ReaderNavbar
         user={user}
@@ -237,7 +237,6 @@ export default function MangaReader() {
             <Show when={panels.state === "ready" && user.state === "ready"}>
               <div class="h-full w-full flex justify-center items-center pt-0.5">
                 <NavigationButtons
-                  currentPlatform={currentPlatform}
                   isLastPanel={() => panelIndex() === panels()?.length! - 1}
                   isFirstPanel={() => panelIndex() === 0}
                   isDoublePanels={isDoublePanels}
@@ -248,22 +247,26 @@ export default function MangaReader() {
                   handleSetLastPanel={handleSetLastPanel}
                   handleSetFirstPanel={handleSetFirstPanel}
                 />
-                <h1
-                  class="text-nowrap text-secondary rounded-b-sm hover:shadow-md hover:shadow-primary/50
-								select-none font-medium px-3 z-50 h-fit pb-0.5 opacity-0 cursor-default
-								hover:opacity-100 hover:bg-primary transition-all duration-300"
-                  style={{
-                    position: "absolute",
-                    top: "43px",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                  }}
-                >
-                  {currentMangaFolder()?.title}
-                </h1>
-
                 <div class="relative flex flex-row justify-center items-center"
                 >
+                  <div
+                    class="w-full h-fit pb-20 text-lg flex justify-center z-50 opacity-0 group hover:opacity-100 transition-opacity duration-300 absolute"
+                    style={{
+                      top: "0",
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                    }}
+                  >
+                    <h1
+                      class="p-1 leading-none truncated w-fit text-center text-nowrap text-secondary bg-primary 
+										group-hover:shadow-md group-hover:mix-blend-luminosity
+										select-none px-3 h-fit pb-1.5 rounded-b-sm 										
+											font-semibold will-change-auto z-50"
+                    >
+                      {currentMangaFolder()?.title}
+                    </h1>
+                  </div>
+
                   {/* Previous Panels - Absolute positioned, opacity 0.01 */}
                   <Show when={PREV_PANELS().first && PREV_PANELS().second && panelIndex() - 2 >= 1}>
                     <Show when={panelIndex() + 1 <= panels()!.length - 1}>
@@ -283,7 +286,7 @@ export default function MangaReader() {
                         src={convertFileSrc(CURRENT_PANELS().second?.path!)}
                         alt={CURRENT_PANELS().second?.title}
                         class="select-none 
-											 bg-black 
+											 bg-black will-change-auto 
 											 object-contain 
 											 max-h-[calc(100vh-37px)] max-w-[calc((100vw-10px)/2)] 
 											 shadow-[-10px_0_20px_-14px_rgba(0,0,0,0.6)]"  // Shadow only on the outer left
@@ -296,7 +299,7 @@ export default function MangaReader() {
                       alt={CURRENT_PANELS().first?.title}
                       class={cn(
                         `select-none 
-											 bg-black 
+											 bg-black will-change-auto
 											 object-contain max-h-[calc(100vh-37px)] 
 											 max-w-[calc((100vw-10px)/2)]`,
                         isDoublePanels()
@@ -318,23 +321,35 @@ export default function MangaReader() {
                       isDoublePanels={isDoublePanels}
                     />
                   </Show>
+
+                  <div
+                    class={cn("w-full h-fit pt-20 flex justify-between items-end text-lg z-50 opacity-0 group hover:opacity-100 transition-opacity duration-300 absolute",
+                      !isDoublePanels && "justify-center"
+                    )}
+                    style={{
+                      bottom: "0",
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                    }}
+                  >
+                    <Show when={isDoublePanels()}>
+                      <p class="bg-primary text-sm select-none text-muted font-medium py-1 px-2">
+                        {CURRENT_PANELS().second?.title}
+                      </p>
+                    </Show>
+                    <h1
+                      class={cn("w-fit flex flex-col text-center text-nowrap text-secondary bg-primary group-hover:shadow-md group-hover:mix-blend-luminosity select-none px-3 h-fit pb-0.5 rounded-t-sm font-semibold will-change-auto z-50",
+											!isDoublePanels() && "rounded-none"
+                      )}
+                    >
+                      {panelIndex() + 1}/{panels()?.length!}
+                    </h1>
+                    <p class="bg-primary text-sm select-none text-muted font-medium py-1 px-2">
+                      {CURRENT_PANELS().first?.title}
+                    </p>
+                  </div>
+
                 </div>
-                <h2
-                  class="rounded-t-sm hover:shadow-md hover:shadow-primary 
-									select-none text-accent/35 font-medium px-3 hover:text-secondary hover:bg-primary transition-all duration-300"
-                  style={{
-                    position: "absolute",
-                    bottom: "0",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                  }}
-                >
-                  {panelIndex() + 1}/{panels()?.length!}
-                </h2>
-                <p class="text-sm select-none absolute right-0 bottom-0 text-muted font-medium px-3">{CURRENT_PANELS().first?.title}</p>
-                <Show when={isDoublePanels()}>
-                  <p class="text-sm select-none absolute left-0 bottom-0 text-muted font-medium px-3">{CURRENT_PANELS().second?.title}</p>
-                </Show>
               </div>
             </Show>
           </Show>
@@ -345,7 +360,6 @@ export default function MangaReader() {
 }
 
 interface NavigationButtonsProps {
-  currentPlatform: Platform;
   isLastPanel: () => boolean;
   isFirstPanel: () => boolean;
   isDoublePanels: () => boolean;
@@ -358,7 +372,6 @@ interface NavigationButtonsProps {
 }
 
 const NavigationButtons = ({
-  currentPlatform,
   isLastPanel,
   isFirstPanel,
   isDoublePanels,
@@ -373,8 +386,7 @@ const NavigationButtons = ({
     {/* Left Button */}
     <div
       class={cn(
-        "h-[97.1%] w-1/4 z-20 absolute left-0 flex items-center cursor-pointer justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30",
-        currentPlatform === "macos" && "h-full",
+        "h-full w-1/4 z-20 absolute left-0 flex items-center cursor-pointer justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30 will-change-auto",
         isLastPanel() && "opacity-30 bg-primary/15 animate-pulse"
       )}
       onClick={async () => {
@@ -402,8 +414,7 @@ const NavigationButtons = ({
     {/* Right Button */}
     <div
       class={cn(
-        "h-[97.1%] w-1/4 z-20 absolute right-0 flex items-center cursor-pointer justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30",
-        currentPlatform === "macos" && "h-full",
+        "h-full w-1/4 z-20 absolute right-0 flex items-center cursor-pointer justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30 will-change-auto",
         isFirstPanel() && "hover:opacity-70"
       )}
       onClick={async () => {
@@ -445,7 +456,7 @@ const RenderImagePanels = ({
   isDoublePanels: Accessor<boolean>;
 }) => {
   return (
-    <div class="absolute left-0 top-0 flex flex-row transition-opacity duration-0" style={{ opacity: 0.01 }}>
+    <div class="absolute left-0 top-0 flex flex-row transition-opacity duration-0 will-change-auto" style={{ opacity: 0.01 }}>
       {/* Left panel (SECOND; shown only in double panel mode) */}
       <Show when={isDoublePanels()}>
         <img
