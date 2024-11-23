@@ -1,7 +1,7 @@
 import { useParams } from "@solidjs/router";
 import { Transition } from "solid-transition-group";
 import LibraryHeader from "./header";
-import { createEffect, createResource, createSignal, Show } from "solid-js";
+import { createEffect, createResource, createSignal, onMount, Show } from "solid-js";
 import NavBar from "../../main-components/navbar";
 import get_user_by_id from "../../tauri-cmds/get_user_by_id";
 import get_os_folder_by_path from "../../tauri-cmds/mpv/get_os_folder_by_path";
@@ -13,7 +13,7 @@ import upsert_read_os_dir from "../../tauri-cmds/handle_stale_folder";
 
 export default function Library() {
   const params = useParams();
-  const [folderPath] = createSignal(decodeURIComponent(params.folder));
+  const folderPath = () => decodeURIComponent(params.folder || "");
 
   const [mainParentFolder] = createResource(
     () => folderPath(),
@@ -27,33 +27,64 @@ export default function Library() {
     get_os_folder_by_path
   );
 
-  const [hasFullyHydrated, setHasFullyHydrated] = createSignal(false);
   const [showHiddenChildFolders, setShowHiddenChildFolders] = createSignal(false);
+  const [hasMangaFolders, sethasMangaFolders] = createSignal(false);
+  const [hasParentFolders, setHasParentFolders] = createSignal(false);
 
-  createEffect(async () => {
-    if (
-      !hasFullyHydrated()
-      && folderPath()
-      && mainParentFolder()
-      && user()
-      && childFolders()
-    ) {
-      const is_refetch = await
-        upsert_read_os_dir(
-          mainParentFolder()?.path!,
-          mainParentFolder()?.parent_path,
-          user()?.id!,
-          childFolders()!,
-          undefined
-        );
-      if (is_refetch) {
-        console.log("stale values detected, refreshing...")
-        setHasFullyHydrated(true);
-        await refetchChildFolders();
+  let [hasFullyHydrated, { mutate: setHasFullyHydrated }] = createResource(
+    folderPath, (_) => false
+  );
+
+  // 2. Separate effect to determine folder types
+  createEffect(() => {
+    if (childFolders()) {
+      let hasManga = false;
+      let hasParent = false;
+
+      for (const f of childFolders()!) {
+        if (f.is_manga_folder) {
+          hasManga = true;
+        } else {
+          hasParent = true;
+        }
+        if (hasManga && hasParent) {
+          break;
+        }
       }
-      console.log(childFolders())
+
+      sethasMangaFolders(hasManga);
+      setHasParentFolders(hasParent);
+      //console.log(childFolders());
     }
   });
+
+  // 1. Handle hydration logic separately
+  createEffect(async () => {
+    if (
+      !hasFullyHydrated() &&
+      folderPath() &&
+      mainParentFolder() &&
+      user() &&
+      childFolders.state === "ready" &&
+      childFolders()!.length > 0
+    ) {
+      console.log("sending these childf olders into upsert: ", childFolders())
+      const is_refetch = await upsert_read_os_dir(
+        mainParentFolder()?.path!,
+        mainParentFolder()?.parent_path,
+        user()?.id!,
+        childFolders()!,
+        undefined
+      );
+
+      if (is_refetch) {
+        console.log("stale values detected, refreshing...");
+        setHasFullyHydrated(true);
+        await refetchChildFolders(); // Refetch if values are stale
+      }
+    }
+  });
+
 
   return (
     <main class="w-full h-[100vh] relative overflow-auto" style={{ "scrollbar-gutter": "stable" }}>
@@ -72,7 +103,7 @@ export default function Library() {
           a.finished.then(done);
         }}
       >
-        <Tabs defaultValue="volumes" class="w-full" orientation="horizontal">
+        <Tabs defaultValue="chapters" class="w-full" orientation="horizontal">
           <Show
             when={mainParentFolder.state === "ready" && user.state === "ready"}>
             <Transition
@@ -93,14 +124,33 @@ export default function Library() {
             </Transition>
             <TabsList class="w-full h-9 border">
               <Show when={childFolders()}>
-                <TabsTrigger value="volumes" class="w-fit lg:text-base folders flex flex-row gap-x-0.5">
-                  Volumes
-                  <IconFolderFilled class="ml-0.5 w-3 stroke-[2.4px]" />
-                </TabsTrigger>
+                <Show when={hasMangaFolders()}>
+                  <TabsTrigger value="chapters" class="w-fit lg:text-base folders flex flex-row gap-x-0.5">
+                    Chapters
+                    <IconFolderFilled class="ml-0.5 w-3 stroke-[2.4px]" />
+                  </TabsTrigger>
+                </Show>
+                <Show when={hasParentFolders()}>
+                  <TabsTrigger value="volumes" class="w-fit lg:text-base folders flex flex-row gap-x-0.5">
+                    Volumes
+                    <IconFolderFilled class="ml-0.5 w-3 stroke-[2.4px]" />
+                  </TabsTrigger>
+                </Show>
               </Show>
               <TabsIndicator />
             </TabsList>
             <Show when={childFolders()}>
+              <TabsContent value="chapters">
+                <LibraryFoldersSection
+                  user={user}
+                  mainParentFolder={mainParentFolder}
+                  childFolders={childFolders}
+                  refetchChildFolders={refetchChildFolders}
+                  showHiddenChildFolders={showHiddenChildFolders}
+                  folderSectionType="manga"
+                  folderPath={folderPath}
+                />
+              </TabsContent>
               <TabsContent value="volumes">
                 <LibraryFoldersSection
                   user={user}
@@ -108,6 +158,8 @@ export default function Library() {
                   childFolders={childFolders}
                   refetchChildFolders={refetchChildFolders}
                   showHiddenChildFolders={showHiddenChildFolders}
+                  folderSectionType="parent"
+                  folderPath={folderPath}
                 />
               </TabsContent>
             </Show>
