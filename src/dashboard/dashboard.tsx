@@ -28,7 +28,7 @@ export default function Dashboard() {
         setShowHiddenFolders={setShowHiddenFolders}
       />
       <section class="h-fit w-full py-4 px-3 md:px-16 lg:px-28 xl:px-44 flex flex-row gap-2">
-        <div class="grid grid-cols-4 gap-2 min-h-[calc(4*cardHeight)]">
+        <div class="grid grid-cols-4 gap-2">
           <Show when={user() && osFolders.state === "ready" && osFolders()!.length > 0}>
             <For each={osFolders()}>{(folder) =>
               <>
