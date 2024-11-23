@@ -27,7 +27,7 @@ export type OsFolder = {
   is_manga_folder: boolean;
   is_double_panels: boolean;
   zoom: number;
-	is_hidden: boolean;
+  is_hidden: boolean;
   update_date: string;
   update_time: string;
 }
@@ -37,8 +37,16 @@ export type MangaPanel = {
   path: string;
   title: string;
   parent_path: string;
+  metadata: FileMetadata;
   is_read: bool;
   update_date: string;
   update_time: string;
+}
+
+export type FileMetadata = {
+  created: number,
+  modified: number,
+  accessed: number,
+  size: number,
 }
 
