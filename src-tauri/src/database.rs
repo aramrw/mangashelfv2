@@ -36,7 +36,7 @@ pub struct FileMetadata {
 
 impl FileMetadata {
     // Constructor to get metadata of a file
-    pub fn from_path(path: &str) -> Option<Self> {
+    pub fn from_path(path: impl AsRef<Path>) -> Option<Self> {
         let metadata = std::fs::metadata(path).ok();
 
         if let Some(metadata) = metadata {
@@ -283,9 +283,11 @@ pub fn get_os_folders_by_path(
     let rtx = db.r_transaction()?;
     let mut folders: Vec<OsFolder> = rtx
         .scan()
-        .secondary(OsFolderKey::parent_path)?
-        .start_with(Some(parent_path.as_str()))?
-        .try_collect()?;
+        .secondary(OsFolderKey::parent_path)? // Specify the index for filtering
+        .all()? // Result<Iterator<Item = Result<OsFolder, Error>>>
+        .filter_map(|result| result.ok()) // Extract successful `OsFolder` values, skipping errors
+        .filter(|folder: &OsFolder| folder.parent_path.as_deref() == Some(parent_path.as_str())) // Match parent_path
+        .collect();
 
     if folders.is_empty() {
         return Err(DatabaseError::OsFoldersNotFound(format!(
