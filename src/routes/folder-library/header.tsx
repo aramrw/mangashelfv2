@@ -4,6 +4,7 @@ import { OsFolder, UserType } from "../../models";
 import { useNavigate } from "@solidjs/router";
 import { IconBookFilled } from "@tabler/icons-solidjs";
 import { cn } from "../../libs/cn";
+import { FolderDescription } from "./folder-card";
 
 export function escapeCSSUrl(url: string) {
   return url.replace(/\(/g, '\\(').replace(/\)/g, '\\)');
@@ -23,7 +24,7 @@ export default function ({
 
 
   return (
-    <header class="sm:px-2 md:px-16 lg:px-30 xl:px-40 w-full h-fit py-3 px-2 relative">
+    <header class="sm:px-2 md:px-16 lg:px-30 xl:px-40 w-full h-fit py-3 px-2 relative will-change">
       <Show when={mainParentFolder() && mainParentFolder()?.cover_img_path}>
         <div
           class="absolute inset-0 z-0"
@@ -37,17 +38,22 @@ export default function ({
           }}
         />
       </Show>
-      <h1 class="text-secondary/70 bg-transparent mix-blend-luminosity w-fit font-semibold z-10 relative text-medium md:text-xl 
-        lg:text-2xl shadow-2xl rounded-none px-0.5 border-secondary/70 border-2 mb-1">
+      <h1 class="text-secondary/100 mix-blend-hard-light w-fit font-semibold z-10 relative 
+				text-2xl px-1 md:text-3xl md:py-0.5
+				shadow-2xl rounded-[2px] border-secondary/70 border-2 mb-1 backdrop-blur-xl cursor-default">
         {mainParentFolder()?.title}
       </h1>
       <div class="w-fit flex flex-row items-center gap-1">
-        <h2 class="text-secondary/50 mb-2 text-xs w-fit font-semibold z-15 relative 
-					bg-transparent mix-blend-luminosity rounded-none border-secondary/50 border-[1.5px] px-1 shadow-md">
+        <h2 class="text-secondary mb-2 w-fit font-semibold z-15 relative 
+					text-xs px-1 lg:text-md
+					bg-transparent mix-blend-luminosity rounded-[2px]  border-secondary/50 border-[1.5px] shadow-md 
+					backdrop-blur-lg select-none cursor-default">
           {mainParentFolder()?.update_date}
         </h2>
-        <h3 class="text-secondary/50 mb-2 text-xs w-fit font-semibold z-15 relative 
-					bg-transparent mix-blend-luminosity rounded-none border-secondary/50 border-[1.5px] px-1 shadow-md">
+        <h3 class="text-secondary mb-2 w-fit font-semibold z-15 relative 
+					text-xs px-1 lg:text-md
+					bg-transparent mix-blend-luminosity rounded-[2px] border-secondary/50 border-[1.5px] shadow-md
+					backdrop-blur-lg select-none cursor-default">
           {mainParentFolder()?.update_time}
         </h3>
       </div>
@@ -68,7 +74,7 @@ export default function ({
               ? convertFileSrc(mainParentFolder()?.last_read_panel?.path!)
               : convertFileSrc(mainParentFolder()?.cover_img_path!)}
             class="select-none h-72 md:h-[320px] object-contain lg:h-[400px] 
-              w-auto z-30 rounded-none bg-black 
+              w-auto z-30 bg-black 
               border-transparent border-2 shadow-md"
           />
           <Show when={mainParentFolder()?.last_read_panel?.path && lastReadMangaFolder()}>
@@ -81,27 +87,9 @@ export default function ({
                 transform: 'translate(-50%, -50%)' // Center the Play button within the image
               }}
             />
-            {/* Hover Overlay for Extended Description */}
-            <div class="absolute inset-0 bg-black/90 opacity-0 group-hover:opacity-100 transition-opacity duration-200
-                        flex items-center justify-center text-white p-4 z-50">
-              <p class="text-sm font-medium absolute left-2 top-2 text text-zinc-100 bg-transparent 
-												 mix-blend-difference w-fit z-10 shadow-2xl rounded-none px-0.5">
-                {lastReadMangaFolder()?.title}
-              </p>
-              <p class="text-[13px] font-medium absolute left-2 top-7 text text-zinc-300 bg-transparent 
-												 mix-blend-difference w-fit z-10 shadow-2xl rounded-none px-0.5">
-                {lastReadMangaFolder()?.last_read_panel?.title}
-              </p>
-              <p class="text-[12px] font-medium absolute right-2 bottom-2 text text-zinc-300 bg-transparent 
-												mix-blend-difference w-fit z-10 shadow-2xl rounded-none px-0.5">
-                {lastReadMangaFolder()?.update_date}
-              </p>
-              <p class="text-[13px] font-medium absolute right-2 bottom-6 text text-zinc-300 bg-transparent 
-												mix-blend-difference w-fit z-10 shadow-2xl rounded-none px-0.5">
-                {lastReadMangaFolder()?.update_time}
-              </p>
-            </div>
-
+            <FolderDescription
+              folder={() => mainParentFolder()?.last_read_panel}
+            />
           </Show>
         </div>
       </Show>
