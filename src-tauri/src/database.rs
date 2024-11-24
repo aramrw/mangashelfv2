@@ -106,6 +106,7 @@ pub mod data {
             pub cover_img_path: Option<String>,
             pub is_manga_folder: bool,
             pub is_double_panels: bool,
+            pub is_read: bool,
             pub zoom: usize,
             pub is_hidden: bool,
             pub update_date: String,
