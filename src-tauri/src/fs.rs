@@ -406,6 +406,7 @@ pub fn read_os_folder_dir(
         cover_img_path: cover_img,
         is_manga_folder,
         is_double_panels: false,
+        is_read: false,
         zoom: 100,
         is_hidden: false,
         update_date,
