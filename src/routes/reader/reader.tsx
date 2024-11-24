@@ -30,6 +30,11 @@ export default function MangaReader() {
   const [isfullyHydrated, setIsFullyHydrated] = createSignal(false)
   const [hasInitialized, setHasInitialized] = createSignal(false);
 
+  createEffect(() => {
+    console.log(currentMangaFolder());
+  });
+
+  // hydrates stale folders
   createEffect(async () => {
     if (
       !isfullyHydrated()
@@ -53,6 +58,7 @@ export default function MangaReader() {
     }
   });
 
+  // makes sure everything is ready on startup
   createEffect(() => {
     if (currentMangaFolder.state === "ready" && panels.state === "ready" && !hasInitialized() && isfullyHydrated()) {
       // Set zoom and double panels from the current folder
@@ -99,11 +105,17 @@ export default function MangaReader() {
       let newFolder = structuredClone(currentMangaFolder()!);
       newFolder.last_read_panel = panels()![panelIndex()];
 
+      if (panelIndex() === panels()!.length - 1) {
+        newFolder.is_read = true;
+      }
+
       let foldersToUpdate = [newFolder];
 
       if (parentFolder.state === "ready" && parentFolder()) {
         let newParentFolder = structuredClone(parentFolder()!);
+        // set the last read panel
         newParentFolder.last_read_panel = panels()![panelIndex()];
+        // set the folders status as fully read 
         foldersToUpdate.push(newParentFolder);
       }
       setCurrentMangaFolder(newFolder);
@@ -221,7 +233,6 @@ export default function MangaReader() {
       <ErrorBoundary fallback={
         (err, reset) => <ErrorAlert error={err.toString()} onClick={reset} />
       }>
-
         <Transition
           appear={true}
           onEnter={(el, done) => {
@@ -339,7 +350,7 @@ export default function MangaReader() {
                     </Show>
                     <h1
                       class={cn("w-fit flex flex-col text-center text-nowrap text-secondary bg-primary group-hover:shadow-md group-hover:mix-blend-luminosity select-none px-3 h-fit pb-0.5 rounded-t-sm font-semibold will-change-auto z-50",
-											!isDoublePanels() && "rounded-none"
+                        !isDoublePanels() && "rounded-none"
                       )}
                     >
                       {panelIndex() + 1}/{panels()?.length!}
@@ -387,7 +398,6 @@ const NavigationButtons = ({
     <div
       class={cn(
         "h-full w-1/4 z-20 absolute left-0 flex items-center cursor-pointer justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30 will-change-auto",
-        isLastPanel() && "opacity-30 bg-primary/15 animate-pulse"
       )}
       onClick={async () => {
         if (isLastPanel()) {
