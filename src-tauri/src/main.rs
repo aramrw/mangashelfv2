@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    mpv_shelf_v2_lib::run()
+    manga_shelf_v2_lib::run()
 }
