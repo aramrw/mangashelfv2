@@ -1,20 +1,23 @@
 use hashbrown::{HashMap, HashSet};
+use image::codecs::jpeg::JpegEncoder;
 use rayon::slice::ParallelSliceMut;
-use serde::{Deserialize, Serialize};
+use std::fs::File;
+use std::io::BufWriter;
 use std::iter::Iterator;
 //use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 //use std::time::Instant;
 use futures_util::TryStreamExt;
-use rayon::iter::IntoParallelRefIterator;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+//use rayon::iter::IntoParallelRefIterator;
+use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 use std::{env, io};
 use std::{fs::read_dir, process::Command};
 use tokio::io::AsyncWriteExt;
 
 use crate::database::data::v1::MangaPanel;
 use crate::database::{data::v1::OsFolder, update_os_folders};
-use crate::database::{delete_os_folders, update_panels};
+use crate::database::{delete_os_folders, update_panels, FolderMetadata};
 use crate::database::{delete_panels, EPISODE_TITLE_REGEX};
 use crate::misc::get_date_time;
 use reqwest::Client;
@@ -60,7 +63,7 @@ fn read_dir_helper(
             if SUPPORTED_IMAGE_FORMATS.get_key(&extension_lossy).is_some() {
                 panel_paths.push(entry_path.to_string_lossy().to_string());
             }
-        } else if entry_path.is_dir() {
+        } else if entry_path.is_dir() && read_dir(&entry_path)?.next().is_some() {
             child_folder_paths.push(entry_path.to_string_lossy().to_string());
             continue;
         }
@@ -68,6 +71,8 @@ fn read_dir_helper(
 
     Ok(())
 }
+
+type FolderGroup = (OsFolder, Vec<OsFolder>, Vec<MangaPanel>);
 
 fn delete_stale_entries(
     handle: AppHandle,
@@ -79,13 +84,8 @@ fn delete_stale_entries(
     Ok(())
 }
 
-type FolderGroup = (OsFolder, Vec<OsFolder>, Vec<MangaPanel>);
 pub trait HasPath {
     fn path(&self) -> &str;
-}
-
-fn normalize_path(path: &str) -> String {
-    path.to_lowercase().replace('\\', "/") // Normalize case and separators.
 }
 
 #[allow(dead_code)]
@@ -278,9 +278,43 @@ pub fn upsert_read_os_dir(
     let (main_folder, mut new_cfs, panels) =
         read_os_folder_dir(dir, user_id, None, parent_path, stale_entries)?;
 
-    // Update panels and folders with the new data.
-    update_panels(&handle, panels, None)?;
+    let app_data_dir = handle.path().app_data_dir()?;
+
     new_cfs.push(main_folder);
+    //let instant = Instant::now();
+    new_cfs
+        .par_iter_mut()
+        .try_for_each(|cf: &mut OsFolder| -> Result<(), ReadDirError> {
+            if let Some(ref input) = cf.cover_img_path {
+                let app_data_cover_img_path = format_cover_img_path(
+                    input,
+                    &app_data_dir,
+                    (cf.parent_path.as_deref(), cf.path.as_ref()),
+                )?;
+
+                if let Some(output) = app_data_cover_img_path {
+                    cf.cover_img_path =
+                        Some(compress_cover_panel(input, &output).unwrap_or_else(|e| {
+                            eprintln!(
+                                "failed to to compress img: {};\n
+                                app_data_dir: {};\n
+                                error: {}",
+                                input, output, e
+                            );
+                            input.to_string()
+                        }));
+                }
+            }
+            Ok(())
+        })?;
+
+    // println!(
+    //     "finished compressing {} folders in {}ms",
+    //     new_cfs.len(),
+    //     instant.elapsed().as_millis()
+    // );
+
+    update_panels(&handle, panels, None)?;
     update_os_folders(handle, new_cfs)?;
 
     // Indicate whether a refetch was performed.
@@ -331,7 +365,7 @@ pub fn read_os_folder_dir(
     let mut total_child_folders: Vec<OsFolder> = Vec::new();
     let mut total_panels: Vec<MangaPanel> = Vec::new();
     let current_folders_panels: Vec<MangaPanel> = panel_paths
-        .into_iter()
+        .into_par_iter()
         .filter_map(|panel_path| {
             MangaPanel::new(
                 user_id.clone(),
@@ -365,27 +399,29 @@ pub fn read_os_folder_dir(
 
     let first_panel = total_panels.first().cloned();
     //println!("first_panel: {:?}", first_panel); // Debug statement
-    let mut cover_img = first_panel
-        .as_ref()
-        .map(|p| normalize_path(&p.path.clone()));
+    let mut cover_img = first_panel.as_ref().map(|p| p.path.clone());
 
     let child_folders_group: Vec<FolderGroup> = childfolder_paths
         .into_par_iter()
         .filter_map(|folder_path| {
-            read_os_folder_dir(
+            match read_os_folder_dir(
                 folder_path,
                 user_id.clone(),
                 update_datetime.clone(),
                 Some(path.clone()),
                 StaleEntries::None,
-            )
-            .ok()
+            ) {
+                Ok(i) => Some(i),
+                Err(e) => {
+                    eprintln!("{}", e);
+                    None
+                }
+            }
         })
         .collect();
 
     for group in child_folders_group.into_iter() {
         let (folder, c_folders, g_panels) = group;
-        total_panels.extend(g_panels);
 
         if cover_img.is_none() {
             if let Some(cover_img_path) = &folder.cover_img_path {
@@ -393,9 +429,11 @@ pub fn read_os_folder_dir(
             }
         }
 
+        total_panels.extend(g_panels);
         total_child_folders.push(folder);
         total_child_folders.extend(c_folders);
     }
+    let metadata = FolderMetadata::from_path(&path, total_panels.len(), total_child_folders.len());
 
     let main_folder = OsFolder {
         user_id,
@@ -404,6 +442,7 @@ pub fn read_os_folder_dir(
         parent_path,
         last_read_panel: first_panel,
         cover_img_path: cover_img,
+        metadata,
         is_manga_folder,
         is_double_panels: false,
         is_read: false,
@@ -414,6 +453,76 @@ pub fn read_os_folder_dir(
     };
 
     Ok((main_folder, total_child_folders, total_panels))
+}
+
+fn format_cover_img_path(
+    img_path: &str,
+    app_data_dir: &Path,
+    parent_paths: (Option<&str>, &str),
+) -> Result<Option<String>, ReadDirError> {
+    let file_title = Path::new(&img_path).file_stem().ok_or_else(|| {
+        eprintln!("Error: Invalid file title for cover_img: {}", img_path);
+        ReadDirError::Path(img_path.to_string())
+    })?;
+
+    #[allow(unused_assignments)]
+    let mut final_path = None;
+    let (super_parent, parent) = parent_paths;
+    let parent_dir_title = Path::new(&parent).file_name().ok_or_else(|| {
+        eprintln!("Error: Invalid parent_dir_title for path: {}", parent);
+        ReadDirError::Path(parent.to_string())
+    })?;
+    if let Some(super_parent) = super_parent {
+        let super_parent_title = Path::new(&super_parent).file_name().ok_or_else(|| {
+            eprintln!(
+                "Error: Invalid super_parent_title for parent: {}",
+                super_parent
+            );
+            ReadDirError::Path(super_parent.to_string())
+        })?;
+
+        let cover_path = app_data_dir
+            .join("covers")
+            .join(super_parent_title)
+            .join(parent_dir_title)
+            .join(file_title)
+            .with_extension("cmp.jpg")
+            .to_string_lossy()
+            .to_string();
+        final_path = Some(cover_path);
+    } else {
+        let cover_path = app_data_dir
+            .join("covers")
+            .join(parent_dir_title)
+            .join(file_title)
+            .with_extension("cmp.jpg")
+            .to_string_lossy()
+            .to_string();
+        final_path = Some(cover_path);
+    }
+    Ok(final_path)
+}
+
+pub fn compress_cover_panel(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+) -> Result<String, ReadDirError> {
+    let img_path = input.as_ref();
+    let output = output.as_ref();
+    let img = image::open(img_path)?;
+    let max_size = 1200;
+
+    let resized = img.thumbnail(max_size, max_size);
+    if let Some(parent) = output.parent() {
+        std::fs::create_dir_all(parent).ok();
+    }
+
+    let output_file = File::create(output).unwrap();
+    let buf = BufWriter::new(output_file);
+    let encoder = JpegEncoder::new_with_quality(buf, 80);
+    resized.write_with_encoder(encoder)?;
+
+    Ok(output.to_string_lossy().to_string())
 }
 
 #[command]
