@@ -1,9 +1,9 @@
 use std::{
-    fs::create_dir,
+    fs::{self, read_dir},
     io,
     path::{Path, PathBuf},
     sync::LazyLock,
-    time::SystemTime,
+    time::{Duration, SystemTime},
 };
 
 use data::v1::{MangaPanel, MangaPanelKey, OsFolder, OsFolderKey, User};
@@ -34,6 +34,41 @@ pub struct FileMetadata {
     pub size: Option<u64>,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, Hash, PartialEq)]
+pub struct FolderMetadata {
+    contains: FolderContains,
+    pub size: Option<u64>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, Hash, PartialEq)]
+pub struct FolderContains {
+    files: usize,
+    folders: usize,
+}
+
+// Serialize SystemTime as u64 (seconds since epoch)
+fn _serialize_system_time<S>(time: &Option<SystemTime>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    match time {
+        Some(t) => {
+            let duration_since_epoch = t.duration_since(SystemTime::UNIX_EPOCH).unwrap();
+            serializer.serialize_some(&duration_since_epoch.as_secs())
+        }
+        None => serializer.serialize_none(),
+    }
+}
+
+// Deserialize u64 back into SystemTime
+fn _deserialize_system_time<'de, D>(deserializer: D) -> Result<Option<SystemTime>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let seconds: Option<u64> = Option::deserialize(deserializer)?;
+    Ok(seconds.map(|sec| SystemTime::UNIX_EPOCH + Duration::new(sec, 0)))
+}
+
 impl FileMetadata {
     // Constructor to get metadata of a file
     pub fn from_path(path: impl AsRef<Path>) -> Option<Self> {
@@ -57,13 +92,29 @@ impl FileMetadata {
     }
 }
 
+impl FolderMetadata {
+    pub fn from_path(path: impl AsRef<Path>, img_len: usize, dir_len: usize) -> Option<Self> {
+        let metadata = std::fs::metadata(path).ok();
+        if let Some(metadata) = metadata {
+            let size = Some(metadata.len());
+            let contains = FolderContains {
+                files: img_len,
+                folders: dir_len,
+            };
+
+            return Some(Self { size, contains });
+        }
+        None
+    }
+}
+
 pub mod data {
     use native_db::{native_db, ToKey};
     use native_model::{native_model, Model};
     use serde::{Deserialize, Serialize};
 
     pub mod v1 {
-        use crate::database::FileMetadata;
+        use crate::database::{FileMetadata, FolderMetadata};
 
         use super::*;
 
@@ -104,6 +155,8 @@ pub mod data {
             pub parent_path: Option<String>,
             pub last_read_panel: Option<MangaPanel>,
             pub cover_img_path: Option<String>,
+            pub metadata: Option<FolderMetadata>,
+            // everything below should be put into a struct at some point to organize
             pub is_manga_folder: bool,
             pub is_double_panels: bool,
             pub is_read: bool,
@@ -196,8 +249,8 @@ impl MangaPanel {
             match FileMetadata::from_path(&self.path) {
                 Some(new_metadata) => {
                     // Compare the modified time and size
-                    current_metadata.modified != new_metadata.modified
-                        || current_metadata.size != new_metadata.size
+                    //current_metadata.modified != new_metadata.modified ||
+                    current_metadata.size != new_metadata.size
                 }
                 None => true, // If metadata can't be fetched, assume it's stale
             }
@@ -207,21 +260,43 @@ impl MangaPanel {
     }
 
     // Update the manga panel's metadata
-    pub fn update_metadata(&mut self) {
+    pub fn _update_metadata(&mut self) {
         if let Some(new_metadata) = FileMetadata::from_path(&self.path) {
             self.metadata = Some(new_metadata);
         }
     }
 }
 
-pub fn init_database(app_data_dir: &PathBuf, handle: &AppHandle) -> Result<(), db_type::Error> {
-    if !app_data_dir.exists() {
-        std::fs::create_dir(app_data_dir)?;
-        std::fs::create_dir(app_data_dir.join("frames"))?;
+impl OsFolder {
+    pub fn delete_app_data_cover_folder(&self, app_data_dir: &Path) -> Result<(), io::Error> {
+        //dbg!(app_data_dir);
+        for e in read_dir(app_data_dir.join("covers"))? {
+            let e = e?;
+            let name = e.file_name();
+            let name = name.to_str();
+            if e.path().is_dir() {
+                if let Some(dirname) = name {
+                    if self.title == dirname {
+                        fs::remove_dir_all(e.path())?;
+                    }
+                }
+            } else if e.path().is_file() {
+                if let Some(ci_path) = &self.cover_img_path {
+                    if let Some(filename) = name {
+                        if ci_path == filename {
+                            fs::remove_file(e.path())?;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
     }
-    let plugins_dir = app_data_dir.join("plugins");
-    if !plugins_dir.exists() {
-        create_dir(plugins_dir).unwrap();
+}
+
+pub fn init_database(app_data_dir: &Path, handle: &AppHandle) -> Result<(), db_type::Error> {
+    if !app_data_dir.exists() {
+        std::fs::create_dir_all(app_data_dir.join("covers"))?;
     }
     let db_path = app_data_dir.join("main").with_extension("rdb");
     Builder::new().create(&DBMODELS, &db_path)?;
@@ -433,6 +508,7 @@ pub fn delete_os_folders(
     handle: AppHandle,
     os_folders: Vec<OsFolder>,
 ) -> Result<(), DatabaseError> {
+    let app_data_dir = handle.path().app_data_dir()?;
     let db_path = handle.state::<PathBuf>().to_string_lossy().to_string();
     let db = Builder::new().open(&DBMODELS, db_path)?;
 
@@ -462,6 +538,10 @@ pub fn delete_os_folders(
         for f in child_folders {
             rwtx.remove(f)?;
         }
+
+        folder
+            .delete_app_data_cover_folder(&app_data_dir)
+            .map_err(|e| DatabaseError::DeleteCoverFolder(folder.path.clone(), e.to_string()))?;
 
         // Finally, delete the folder itself
         rwtx.remove(folder)?;
