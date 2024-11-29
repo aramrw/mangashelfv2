@@ -24,6 +24,7 @@ export type OsFolder = {
   parent_path: string | undefined;
   last_read_panel: MangaPanel | undefined;
   cover_img_path: string | undefined;
+	metadata: FolderMetadata;
   is_manga_folder: boolean;
   is_double_panels: boolean;
   is_read: boolean;
@@ -45,9 +46,19 @@ export type MangaPanel = {
 }
 
 export type FileMetadata = {
-  created: number,
-  modified: number,
-  accessed: number,
-  size: number,
+  created: number;
+  modified: number;
+  accessed: number;
+  size: number;
+}
+
+export type FolderMetadata = {
+  contains: FolderContains;
+	size: number;
+}
+
+export type FolderContains = {
+  files: number;
+  folders: number;
 }
 
