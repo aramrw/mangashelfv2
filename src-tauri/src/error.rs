@@ -19,6 +19,8 @@ pub enum MangaShelfError {
     ReadDir(#[from] ReadDirError),
     #[error("{0:#?}")]
     Io(#[from] io::Error),
+    #[error("{0}")]
+    Tuari(#[from] tauri::Error),
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -35,6 +37,8 @@ pub enum DatabaseError {
     IoError(#[from] io::Error),
     #[error("{0}")]
     Tuari(#[from] tauri::Error),
+    #[error("failed to delete cover folder for path: {0}; reason: {1}")]
+    DeleteCoverFolder(String, String),
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -45,6 +49,10 @@ pub enum ReadDirError {
     Image(#[from] image::ImageError),
     #[error("{0} contains all the same folders & files as it did before")]
     FullyHydrated(String),
+    #[error("{0:#?}")]
+    Tuari(#[from] tauri::Error),
+    #[error("path is invalid: {0}")]
+    Path(String),
 }
 
 #[derive(thiserror::Error, Debug)]
