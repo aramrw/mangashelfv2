@@ -72,18 +72,6 @@ export default function MangaReader() {
     second: isDoublePanels() ? panels()?.[panelIndex() + 1] : null,
   });
 
-  const NEXT_PANELS = () => ({
-    // Next panels move forward by 2 if in double panel mode, 1 if in single
-    first: panels()?.[panelIndex() + (isDoublePanels() ? 2 : 1)],
-    second: isDoublePanels() ? panels()?.[panelIndex() + 3] : null,
-  });
-
-  const PREV_PANELS = () => ({
-    // Previous panels move backward by 2 if in double panel mode, 1 if in single
-    first: panels()?.[panelIndex() - (isDoublePanels() ? 2 : 1)],
-    second: isDoublePanels() ? panels()?.[panelIndex() - 1] : null,
-  });
-
   const handleUpdateFolders = async () => {
     if (currentMangaFolder.state === "ready" && panelIndex() !== undefined && panels.state === "ready" && user.state === "ready") {
       let newFolder = structuredClone(currentMangaFolder()!);
@@ -262,9 +250,9 @@ export default function MangaReader() {
                   <For each={panels()}>
                     {(panel, i) => {
                       return (
-                        <>
+                        <Show when={i() >= panelIndex() - 10 && i() <= panelIndex() + 10}>
                           <RenderPanel panel={panel} isDoublePanels={isDoublePanels} panelIndex={panelIndex} i={i} />
-                        </>
+                        </Show>
                       );
                     }}
                   </For>
@@ -389,12 +377,12 @@ function RenderPanel({
   const isCurrent = () => panelIndex() === i();
   const isNext = () => isDoublePanels() && panelIndex() === i() + 1;
 
+  // Styles for positioning
   let style = {
     position: "absolute",
     top: "50%",
     left: "50%", // Center horizontally
     transform: "translate(-50%, -50%)", // Adjust for exact centering
-    //transition: "opacity 0.07s ease-in-out", // Smooth opacity transition
   } satisfies JSX.CSSProperties;
 
   return (
@@ -402,14 +390,11 @@ function RenderPanel({
       src={convertFileSrc(panel.path)}
       alt={panel.title || "Panel"}
       class={cn(
-        `select-none bg-black will-change-auto
-        object-contain
-        max-h-[calc(100vh-37px)] }`,
+        "select-none bg-black will-change-auto object-contain max-h-[calc(100vh-37px)]",
         isCurrent() || isNext() ? "opacity-100 z-20" : "opacity-[0.002]",
-        //isDoublePanels() && !isNext() ? "shadow-[-1px_0_10px_0px_rgba(0,0,0,0.2)]" : "shadow-[0_0_20px_-10px_rgba(0,0,0,0.6)]",
         isDoublePanels() ? "max-w-[calc((100vw-10px)/2)]" : "max-w-[calc((100vw-10px))]",
       )}
-      style={isCurrent() || isNext() ? { position: "relative"} : style}
+      style={isCurrent() || isNext() ? { position: "relative" } : style}
       onError={(e) => {
         console.error(`Image failed to load: ${convertFileSrc(panel.path)}`);
         e.preventDefault();
