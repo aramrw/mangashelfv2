@@ -66,7 +66,7 @@ export default function Library() {
       mainParentFolder() &&
       user() &&
       childFolders.state === "ready" &&
-      childFolders()!.length > 0
+      childFolders()
     ) {
       console.log("sending these childf olders into upsert: ", childFolders())
       const is_refetch = await upsert_read_os_dir(
