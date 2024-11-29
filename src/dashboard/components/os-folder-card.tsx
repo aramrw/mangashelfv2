@@ -7,7 +7,7 @@ import FolderCardContextMenuContent from "./folder-card-cm-context";
 import { useNavigate } from "@solidjs/router";
 import { Transition } from "solid-transition-group";
 import { cn } from "../../libs/cn";
-import { FolderDescription } from "../../routes/folder-library/folder-card";
+import { OsFolderDescription } from "../../main-components/description/folder-desc";
 
 const OsFolderCard = ({
   folder,
@@ -82,7 +82,7 @@ const OsFolderCard = ({
                   {folder.title}
                 </span>
               </Show>
-              <FolderDescription
+              <OsFolderDescription
                 folder={() => folder}
               />
             </div>
