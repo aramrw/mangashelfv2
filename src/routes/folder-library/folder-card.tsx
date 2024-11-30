@@ -75,7 +75,7 @@ const LibraryFolderCard = ({
             </Show>
             <Show when={folder.is_read && !folder.is_hidden}>
               <IconBookFilled
-                class="h-[40%] w-fit bg-primary rounded-md absolute p-1 opacity-90
+                class="h-[40%] w-fit bg-primary/80 rounded-md absolute p-1 opacity-90
 									group-hover:opacity-0 transition-all duration-300 fill-secondary"
               />
             </Show>
