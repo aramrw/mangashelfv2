@@ -39,20 +39,36 @@ pub enum DatabaseError {
     Tuari(#[from] tauri::Error),
     #[error("failed to delete cover folder for path: {0}; reason: {1}")]
     DeleteCoverFolder(String, String),
+    #[error("{0}")]
+    SortType(#[from] SortTypeError),
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum ReadDirError {
     #[error("{0}")]
     IoError(#[from] io::Error),
-    #[error("{0}")]
-    Image(#[from] image::ImageError),
     #[error("{0} contains all the same folders & files as it did before")]
     FullyHydrated(String),
     #[error("{0:#?}")]
     Tuari(#[from] tauri::Error),
     #[error("path is invalid: {0}")]
     Path(String),
+    #[error("{0}")]
+    Image(#[from] image::ImageError),
+    #[error("{0}")]
+    MangaImage(#[from] MangaImageError),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum MangaImageError {
+    #[error("{0}")]
+    Io(#[from] io::Error),
+    #[error("{0}")]
+    Image(#[from] image::ImageError),
+    #[error("could not get the pixel type from img: {0}")]
+    InvalidPixelType(String),
+    #[error("{0}")]
+    Resize(#[from] fast_image_resize::ResizeError),
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -63,6 +79,18 @@ pub enum HttpClientError {
     Tuari(#[from] tauri::Error),
     #[error("{0:#?}")]
     Io(#[from] io::Error),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum SortTypeError {
+    #[error("could not convert to SortType from &str: {0}")]
+    FromStr(String),
+}
+
+impl From<SortTypeError> for InvokeError {
+    fn from(error: SortTypeError) -> Self {
+        InvokeError::from_error(error)
+    }
 }
 
 impl From<MangaShelfError> for InvokeError {
