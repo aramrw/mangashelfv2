@@ -13,9 +13,11 @@ const OsFolderCard = ({
   folder,
   user,
   refetch,
+	isLastReadMangaFolder,
 }: {
   folder: OsFolder;
   user: Accessor<UserType | null>;
+	isLastReadMangaFolder?: boolean;
   refetch: (info?: unknown) => OsFolder[] | Promise<OsFolder[] | undefined> | null | undefined;
 }) => {
   const currentPlatform = platform();
@@ -27,13 +29,13 @@ const OsFolderCard = ({
       appear={true}
       onEnter={(el, done) => {
         const a = el.animate([{ opacity: 0 }, { opacity: 1 }], {
-          duration: 600,
+          duration: 300,
         });
         a.finished.then(done);
       }}
       onExit={(el, done) => {
         const a = el.animate([{ opacity: 1 }, { opacity: 0 }], {
-          duration: 600,
+          duration: 300,
         });
         a.finished.then(done);
       }}
@@ -88,7 +90,13 @@ const OsFolderCard = ({
             </div>
           </div>
         </ContextMenuTrigger>
-        <FolderCardContextMenuContent user={user} folder={folder} refetch={refetch} currentPlatform={currentPlatform} />
+        <FolderCardContextMenuContent 
+					user={user} 
+					folder={folder} 
+					refetch={refetch} 
+					currentPlatform={currentPlatform} 
+					isLastReadMangaFolder={isLastReadMangaFolder}
+				/>
       </ContextMenu>
     </Transition>
   );
