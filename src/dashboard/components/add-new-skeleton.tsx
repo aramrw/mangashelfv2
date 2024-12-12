@@ -2,7 +2,7 @@ import { IconFilePlus, IconFolderPlus, IconPlus } from "@tabler/icons-solidjs";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
 import { open } from '@tauri-apps/plugin-dialog';
 import { OsFolder, UserType } from "../../models";
-import { Accessor, createSignal, Setter, Show } from "solid-js";
+import { Accessor, createSignal, Show } from "solid-js";
 import { Transition } from "solid-transition-group";
 import upsert_read_os_dir from "../../tauri-cmds/handle_stale_folder";
 import Spinner from "../../main-components/icons/spinner";
@@ -23,22 +23,21 @@ const AddNewSkeleton = ({
       appear={true}
       onEnter={(el, done) => {
         const a = el.animate([{ opacity: 0 }, { opacity: 1 }], {
-          duration: 600
+          duration: 300
         });
         a.finished.then(done);
       }}
       onExit={(el, done) => {
         const a = el.animate([{ opacity: 1 }, { opacity: 0 }], {
-          duration: 600
+          duration: 300
         });
         a.finished.then(done);
       }}
     >
 
-      <Popover placement="right-start">
+      <Popover placement="left-start">
         <PopoverTrigger class="h-fit">
-          <div class=" z-50
-						w-fit relative flex items-center justify-center 
+          <div class="z-50 w-fit relative flex items-center justify-center 
 						hover:opacity-50 transition-opacity cursor-pointer duration-100 ease-in-out">
             <div
               class="
@@ -76,14 +75,16 @@ const AddNewSkeleton = ({
             </Show>
           </div>
         </PopoverTrigger>
-        <PopoverContent class="p-0 bg-transparent border-none shadow-none text-sm flex flex-col justify-center items-center font-medium">
+        <PopoverContent class="
+					p-0 bg-transparent border-none shadow-none text-sm 
+					flex flex-col justify-center items-center font-medium">
           <ul class="w-fit h-full flex flex-col gap-1">
             <li class="bg-white p-1 rounded-sm shadow-md flex flex-row justify-center items-center w-fit gap-0.5 hover:opacity-50 transition-opacity duration-100 ease-in-out cursor-pointer"
               onClick={async () => {
                 setIsLoading(true);
                 let dir_path = await open({ directory: true });
                 if (dir_path) {
-                  await upsert_read_os_dir(dir_path, undefined, user()!.id, undefined, undefined);
+                  await upsert_read_os_dir(dir_path, undefined, user()!, undefined, undefined);
                   refetch();
                 }
                 setIsLoading(false);
