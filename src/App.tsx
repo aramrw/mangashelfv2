@@ -16,6 +16,7 @@ function App() {
       const dbUser: UserType = {
         id: "1",
         username: "default",
+        last_read_manga_folder: undefined,
         settings: {
           user_id: "1",
           autoplay: true,
