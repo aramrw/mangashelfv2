@@ -10,20 +10,23 @@ import {
 } from "../../components/ui/context-menu";
 import { Platform } from '@tauri-apps/plugin-os';
 import show_in_folder from "../../tauri-cmds/show_in_folder";
-import { delete_os_folders, update_os_folders } from "../../tauri-cmds/os_folders";
 import { IconBackspace, IconBrandFinder, IconFolderSearch } from "@tabler/icons-solidjs";
 import IconHeroEye from "../../main-components/icons/icon-hero-eye";
 import IconHeroSlashEye from "../../main-components/icons/icon-hero-slash-eye";
+import delete_os_folders from "../../tauri-cmds/os_folders/delete_os_folders";
+import update_os_folders from "../../tauri-cmds/os_folders/update_os_folders";
 
 
 export default function FolderCardContextMenuContent({
   folder,
   user,
   refetch,
-  currentPlatform
+  currentPlatform,
+  isLastReadMangaFolder,
 }: {
   folder: OsFolder;
   user: Accessor<UserType | null> | Resource<UserType | null>;
+  isLastReadMangaFolder?: boolean;
   refetch: (info?: unknown) => OsFolder[] | Promise<OsFolder[] | null | undefined> | null | undefined
   currentPlatform: Platform;
 }) {
@@ -54,7 +57,7 @@ export default function FolderCardContextMenuContent({
                 if (user && user() && refetch) {
                   const folderClone = structuredClone(folder);
                   folderClone.is_hidden = !folder.is_hidden;
-                  await update_os_folders([folderClone], user()?.id!);
+                  await update_os_folders([folderClone], user()!);
                   refetch();
                 }
               }
@@ -72,17 +75,19 @@ export default function FolderCardContextMenuContent({
                 <IconHeroSlashEye class="h-auto w-4" />
               </Show>
             </ContextMenuItem>
-            <ContextMenuItem
-              onClick={async () => {
-                if (user && user() && refetch) {
-                  await delete_os_folders([folder], user()?.id!);
-                  refetch();
-                }
-              }}
-            >
-              Remove
-              <IconBackspace class="h-auto w-5" />
-            </ContextMenuItem>
+            <Show when={isLastReadMangaFolder !== true}>
+              <ContextMenuItem
+                onClick={async () => {
+                  if (user && user() && refetch) {
+                    await delete_os_folders([folder], user()!);
+                    refetch();
+                  }
+                }}
+              >
+                Remove
+                <IconBackspace class="h-auto w-5" />
+              </ContextMenuItem>
+            </Show>
           </Show>
         </ContextMenuSubContent>
       </ContextMenuSub >
