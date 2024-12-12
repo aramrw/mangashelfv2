@@ -50,3 +50,4 @@ sysinfo = "0.32.0"
 image = "0.25.5"
 hashbrown = { version = "0.15.1", features = ["rayon"] }
 bimap = "0.6.3"
+fast_image_resize = { version = "5.0.0", features = ["rayon", "image"] }
