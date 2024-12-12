@@ -2,7 +2,7 @@ import { IconAdjustments, IconArrowNarrowLeftDashed, IconColumns1, IconColumns2,
 import { A, useNavigate } from "@solidjs/router";
 import { Accessor, createSignal, onCleanup, onMount, Resource, Setter, Show } from "solid-js";
 import { MangaPanel, OsFolder, UserType } from "../../models";
-import { update_os_folders } from "../../tauri-cmds/os_folders";
+import update_os_folders from "../../tauri-cmds/os_folders/update_os_folders";
 
 export default function ReaderNavbar({
   user,
