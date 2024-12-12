@@ -1,12 +1,16 @@
+use crate::database::data::v1::User;
+use fast_image_resize::images::Image;
+use fast_image_resize::{IntoImageView, Resizer};
+use futures_util::future::join_all;
 use hashbrown::{HashMap, HashSet};
 use image::codecs::jpeg::JpegEncoder;
+use image::{DynamicImage, ImageEncoder, ImageReader};
 use rayon::slice::ParallelSliceMut;
 use std::fs::File;
 use std::io::BufWriter;
 use std::iter::Iterator;
 //use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::time::Instant;
 //use std::time::Instant;
 use futures_util::TryStreamExt;
 //use rayon::iter::IntoParallelRefIterator;
@@ -16,15 +20,17 @@ use std::{fs::read_dir, process::Command};
 use tokio::io::AsyncWriteExt;
 
 use crate::database::data::v1::MangaPanel;
+use crate::database::delete_panels;
 use crate::database::{data::v1::OsFolder, update_os_folders};
-use crate::database::{delete_os_folders, update_panels, FolderMetadata};
-use crate::database::{delete_panels, EPISODE_TITLE_REGEX};
+use crate::database::{delete_os_folders, update_panels, FolderMetadata, HasPath, SortType};
 use crate::misc::get_date_time;
 use reqwest::Client;
 use tauri::{command, AppHandle, Emitter, Manager};
 use tauri_plugin_shell::ShellExt;
 
-use crate::error::{DatabaseError, HttpClientError, MangaShelfError, ReadDirError};
+use crate::error::{
+    DatabaseError, HttpClientError, MangaImageError, MangaShelfError, ReadDirError,
+};
 
 use phf::phf_set;
 
@@ -78,14 +84,11 @@ fn delete_stale_entries(
     handle: AppHandle,
     old_dirs: Vec<OsFolder>,
     old_panels: Vec<MangaPanel>,
+    user: User,
 ) -> Result<(), DatabaseError> {
-    delete_os_folders(handle.clone(), old_dirs)?;
+    delete_os_folders(handle.clone(), old_dirs, Some(user))?;
     delete_panels(&handle, old_panels)?;
     Ok(())
-}
-
-pub trait HasPath {
-    fn path(&self) -> &str;
 }
 
 #[allow(dead_code)]
@@ -241,14 +244,15 @@ fn find_stale_entries(
 }
 
 #[command]
-pub fn upsert_read_os_dir(
+pub async fn upsert_read_os_dir(
     handle: AppHandle,
     dir: String,
     parent_path: Option<String>,
-    user_id: String,
+    user: User,
     mut old_dirs: Option<Vec<OsFolder>>,
     mut old_panels: Option<Vec<MangaPanel>>,
 ) -> Result<bool, MangaShelfError> {
+    let id = user.id.clone();
     // Find stale entries based on the provided directory and old data.
     let mut stale_entries = find_stale_entries(&dir, old_dirs.as_mut(), old_panels.as_mut())?;
     //println!("stale_entries: {:#?}", stale_entries);
@@ -265,7 +269,7 @@ pub fn upsert_read_os_dir(
     {
         if let Some(deleted_entries) = deleted.take() {
             // Only move the deleted entries.
-            delete_stale_entries(handle.clone(), deleted_entries.0, deleted_entries.1)?;
+            delete_stale_entries(handle.clone(), deleted_entries.0, deleted_entries.1, user)?;
         }
     }
 
@@ -276,46 +280,58 @@ pub fn upsert_read_os_dir(
     }
 
     let (main_folder, mut new_cfs, panels) =
-        read_os_folder_dir(dir, user_id, None, parent_path, stale_entries)?;
+        read_os_folder_dir(dir, id, None, parent_path, stale_entries)?;
 
     let app_data_dir = handle.path().app_data_dir()?;
 
     new_cfs.push(main_folder);
-    //let instant = Instant::now();
-    new_cfs
+    let instant = std::time::Instant::now();
+    let compressed_imgs: Vec<EncoderWriterPair> = new_cfs
         .par_iter_mut()
-        .try_for_each(|cf: &mut OsFolder| -> Result<(), ReadDirError> {
+        .filter_map(|cf: &mut OsFolder| {
             if let Some(ref input) = cf.cover_img_path {
                 let app_data_cover_img_path = format_cover_img_path(
                     input,
                     &app_data_dir,
                     (cf.parent_path.as_deref(), cf.path.as_ref()),
-                )?;
+                )
+                .ok();
 
-                if let Some(output) = app_data_cover_img_path {
-                    cf.cover_img_path =
-                        Some(compress_cover_panel(input, &output).unwrap_or_else(|e| {
-                            eprintln!(
-                                "failed to to compress img: {};\n
-                                app_data_dir: {};\n
-                                error: {}",
-                                input, output, e
-                            );
-                            input.to_string()
-                        }));
+                if let Some(Some(output)) = app_data_cover_img_path {
+                    if let Ok(pair) = compress_cover_panel(input, &output) {
+                        cf.cover_img_path = Some(output);
+                        return Some(pair);
+                    }
                 }
             }
-            Ok(())
-        })?;
+            None
+        })
+        .collect();
 
-    // println!(
-    //     "finished compressing {} folders in {}ms",
-    //     new_cfs.len(),
-    //     instant.elapsed().as_millis()
-    // );
+    let mut first_task = None;
+    for (i, (dimg, encoder)) in compressed_imgs.into_iter().enumerate() {
+        let task = tokio::spawn(async move {
+            if let Err(e) = dimg.write_with_encoder(encoder) {
+                eprintln!("{}", e);
+            }
+        });
+        if i == 0 {
+            first_task = Some(task);
+        }
+    }
+
+    if let Some(first) = first_task {
+        first.await.ok();
+    }
+
+    println!(
+        "finished compressing {} folders in {}ms",
+        new_cfs.len(),
+        instant.elapsed().as_millis()
+    );
 
     update_panels(&handle, panels, None)?;
-    update_os_folders(handle, new_cfs)?;
+    update_os_folders(handle, new_cfs, None)?;
 
     // Indicate whether a refetch was performed.
     Ok(true)
@@ -380,22 +396,7 @@ pub fn read_os_folder_dir(
     let is_manga_folder = !current_folders_panels.is_empty();
     total_panels.extend(current_folders_panels);
 
-    total_panels.par_sort_by(|a, b| {
-        // Extract the episode number from the title using regex
-        let num_a = EPISODE_TITLE_REGEX
-            .captures(&a.title)
-            .and_then(|caps| caps.get(1)) // Assuming the first capturing group contains the episode number
-            .and_then(|m| m.as_str().parse::<u32>().ok())
-            .unwrap_or(0);
-
-        let num_b = EPISODE_TITLE_REGEX
-            .captures(&b.title)
-            .and_then(|caps| caps.get(1))
-            .and_then(|m| m.as_str().parse::<u32>().ok())
-            .unwrap_or(0);
-
-        num_a.cmp(&num_b)
-    });
+    total_panels.par_sort_by(SortType::sort(&SortType::EpisodeTitleRegex));
 
     let first_panel = total_panels.first().cloned();
     //println!("first_panel: {:?}", first_panel); // Debug statement
@@ -503,10 +504,12 @@ fn format_cover_img_path(
     Ok(final_path)
 }
 
+pub type EncoderWriterPair = (DynamicImage, JpegEncoder<BufWriter<File>>);
+
 pub fn compress_cover_panel(
     input: impl AsRef<Path>,
     output: impl AsRef<Path>,
-) -> Result<String, ReadDirError> {
+) -> Result<EncoderWriterPair, MangaImageError> {
     let img_path = input.as_ref();
     let output = output.as_ref();
     let img = image::open(img_path)?;
@@ -519,10 +522,10 @@ pub fn compress_cover_panel(
 
     let output_file = File::create(output).unwrap();
     let buf = BufWriter::new(output_file);
-    let encoder = JpegEncoder::new_with_quality(buf, 80);
-    resized.write_with_encoder(encoder)?;
+    let encoder = JpegEncoder::new_with_quality(buf, 95);
+    //resized.write_with_encoder(encoder)?;
 
-    Ok(output.to_string_lossy().to_string())
+    Ok((resized, encoder))
 }
 
 #[command]
