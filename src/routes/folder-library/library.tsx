@@ -1,39 +1,37 @@
 import { useParams } from "@solidjs/router";
 import { Transition } from "solid-transition-group";
 import LibraryHeader from "./header";
-import { createEffect, createResource, createSignal, onMount, Show } from "solid-js";
+import { createEffect, createResource, createSignal, Show } from "solid-js";
 import NavBar from "../../main-components/navbar";
 import get_user_by_id from "../../tauri-cmds/get_user_by_id";
 import get_os_folder_by_path from "../../tauri-cmds/mpv/get_os_folder_by_path";
 import { Tabs, TabsContent, TabsIndicator, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { IconFolderFilled } from "@tabler/icons-solidjs";
 import LibraryFoldersSection from "./folders-section";
-import get_os_folders_by_path from "../../tauri-cmds/get_os_folders_by_path";
 import upsert_read_os_dir from "../../tauri-cmds/handle_stale_folder";
+import get_os_folders_by_path from "../../tauri-cmds/os_folders/get_os_folders_by_path";
 
 export default function Library() {
   const params = useParams();
   const folderPath = () => decodeURIComponent(params.folder || "");
 
-  const [mainParentFolder] = createResource(
-    () => folderPath(),
-    get_os_folder_by_path
-  );
+  const [mainParentFolder] = createResource(() => folderPath(), get_os_folder_by_path);
   const [user] = createResource(() => (mainParentFolder() ? mainParentFolder()?.user_id : null), get_user_by_id);
   const [childFolders, { refetch: refetchChildFolders }] = createResource(
-    () => (mainParentFolder() ? mainParentFolder()?.path : null), get_os_folders_by_path);
+    () => (mainParentFolder() ? mainParentFolder()?.path : null),
+    (parentPath: string) => get_os_folders_by_path(parentPath),
+  );
+
   const [lastReadMangaFolder] = createResource(
-    () => mainParentFolder()?.last_read_panel ? mainParentFolder()?.last_read_panel?.parent_path : null,
-    get_os_folder_by_path
+    () => (mainParentFolder()?.last_read_panel ? mainParentFolder()?.last_read_panel?.parent_path : null),
+    get_os_folder_by_path,
   );
 
   const [showHiddenChildFolders, setShowHiddenChildFolders] = createSignal(false);
   const [hasMangaFolders, sethasMangaFolders] = createSignal(false);
   const [hasParentFolders, setHasParentFolders] = createSignal(false);
 
-  let [hasFullyHydrated, { mutate: setHasFullyHydrated }] = createResource(
-    folderPath, (_) => false
-  );
+  let [hasFullyHydrated, { mutate: setHasFullyHydrated }] = createResource(folderPath, (_) => false);
 
   // 2. Separate effect to determine folder types
   createEffect(() => {
@@ -60,22 +58,9 @@ export default function Library() {
 
   // 1. Handle hydration logic separately
   createEffect(async () => {
-    if (
-      !hasFullyHydrated() &&
-      folderPath() &&
-      mainParentFolder() &&
-      user() &&
-      childFolders.state === "ready" &&
-      childFolders()
-    ) {
-      console.log("sending these childf olders into upsert: ", childFolders())
-      const is_refetch = await upsert_read_os_dir(
-        mainParentFolder()?.path!,
-        mainParentFolder()?.parent_path,
-        user()?.id!,
-        childFolders()!,
-        undefined
-      );
+    if (!hasFullyHydrated() && folderPath() && mainParentFolder() && user() && childFolders.state === "ready" && childFolders()) {
+      console.log("sending these childf olders into upsert: ", childFolders());
+      const is_refetch = await upsert_read_os_dir(mainParentFolder()?.path!, mainParentFolder()?.parent_path, user()!, childFolders()!, undefined);
 
       if (is_refetch) {
         console.log("stale values detected, refreshing...");
@@ -85,13 +70,9 @@ export default function Library() {
     }
   });
 
-
   return (
     <main class="w-full h-[100vh] relative overflow-auto" style={{ "scrollbar-gutter": "stable" }}>
-      <NavBar
-        showHiddenFolders={showHiddenChildFolders}
-        setShowHiddenFolders={setShowHiddenChildFolders}
-      />
+      <NavBar showHiddenFolders={showHiddenChildFolders} setShowHiddenFolders={setShowHiddenChildFolders} />
       <Transition
         appear={true}
         onEnter={(el, done) => {
@@ -103,9 +84,8 @@ export default function Library() {
           a.finished.then(done);
         }}
       >
-        <Tabs defaultValue="chapters" class="w-full" orientation="horizontal">
-          <Show
-            when={mainParentFolder.state === "ready" && user.state === "ready"}>
+        <Tabs class="w-full" orientation="horizontal">
+          <Show when={mainParentFolder.state === "ready" && user.state === "ready"}>
             <Transition
               appear={true}
               onEnter={(el, done) => {
@@ -117,10 +97,7 @@ export default function Library() {
                 a.finished.then(done);
               }}
             >
-              <LibraryHeader
-                mainParentFolder={mainParentFolder}
-                user={user}
-                lastReadMangaFolder={lastReadMangaFolder} />
+              <LibraryHeader mainParentFolder={mainParentFolder} user={user} lastReadMangaFolder={lastReadMangaFolder} />
             </Transition>
             <TabsList class="w-full h-9 border">
               <Show when={childFolders()}>
