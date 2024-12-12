@@ -16,8 +16,7 @@ use crate::database::{
     update_user,
 };
 use crate::fs::{
-    check_cover_img_exists, download_mpv_binary, path_exists, read_os_folder_dir, show_in_folder,
-    upsert_read_os_dir,
+    check_cover_img_exists, download_mpv_binary, path_exists, show_in_folder, upsert_read_os_dir,
 };
 use crate::tray::init_tray;
 
@@ -47,7 +46,6 @@ pub fn run() {
             get_next_folder,
             update_os_folders,
             delete_os_folders,
-            read_os_folder_dir,
             get_panels,
             check_cover_img_exists,
             show_in_folder,
@@ -57,9 +55,9 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
-        .run(|_app_handle, event| {
-            if let tauri::RunEvent::ExitRequested { api, .. } = event {
-                api.prevent_exit();
-            }
+        .run(|_app_handle, _event| {
+            // if let tauri::RunEvent::ExitRequested { api, .. } = event {
+            //     api.prevent_exit();
+            // }
         });
 }

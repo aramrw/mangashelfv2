@@ -12,12 +12,12 @@ import {
 import { Button } from "../components/ui/button";
 
 interface ErrorAlertProps {
-  error: Accessor<string>;
+  error: string;
   onClick?: (event: MouseEvent) => void;
 }
 
 function ErrorAlert(props: ErrorAlertProps) {
-  const [title, ...details] = props.error().split(/:(?![\\\/]|[^:]*[\\\/][^:]*$)/); // Title is the first part, the rest are details
+  const [title, ...details] = props.error.split(/:(?![\\\/]|[^:]*[\\\/][^:]*$)/); // Title is the first part, the rest are details
   const [dialogOpen, setDialogOpen] = createSignal<boolean>(true);
 
   return (

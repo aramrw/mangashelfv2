@@ -8,49 +8,71 @@ import get_os_folder_by_path from "../../tauri-cmds/mpv/get_os_folder_by_path";
 import { Tabs, TabsContent, TabsIndicator, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { IconFolderFilled } from "@tabler/icons-solidjs";
 import LibraryFoldersSection from "./folders-section";
-import get_os_folders_by_path from "../../tauri-cmds/get_os_folders_by_path";
 import upsert_read_os_dir from "../../tauri-cmds/handle_stale_folder";
+import get_os_folders_by_path from "../../tauri-cmds/os_folders/get_os_folders_by_path";
 
 export default function Library() {
   const params = useParams();
-  const [folderPath, setFolderPath] = createSignal(decodeURIComponent(params.folder));
+  const folderPath = () => decodeURIComponent(params.folder || "");
 
-  const [mainParentFolder, { refetch: refetchMainParentFolder }] = createResource(
-    () => folderPath(),
-    get_os_folder_by_path
-  );
+  const [mainParentFolder] = createResource(() => folderPath(), get_os_folder_by_path);
   const [user] = createResource(() => (mainParentFolder() ? mainParentFolder()?.user_id : null), get_user_by_id);
-  const [childFolders, { refetch: refetchChildFolders }] = createResource(() => (mainParentFolder() ? mainParentFolder()?.path : null), get_os_folders_by_path);
+  const [childFolders, { refetch: refetchChildFolders }] = createResource(
+    () => (mainParentFolder() ? mainParentFolder()?.path : null),
+    (parentPath: string) => get_os_folders_by_path(parentPath),
+  );
 
-  const [hasInitialized, setHasInitialized] = createSignal(false);
+  const [lastReadMangaFolder] = createResource(
+    () => (mainParentFolder()?.last_read_panel ? mainParentFolder()?.last_read_panel?.parent_path : null),
+    get_os_folder_by_path,
+  );
 
+  const [showHiddenChildFolders, setShowHiddenChildFolders] = createSignal(false);
+  const [hasMangaFolders, sethasMangaFolders] = createSignal(false);
+  const [hasParentFolders, setHasParentFolders] = createSignal(false);
+
+  let [hasFullyHydrated, { mutate: setHasFullyHydrated }] = createResource(folderPath, (_) => false);
+
+  // 2. Separate effect to determine folder types
+  createEffect(() => {
+    if (childFolders()) {
+      let hasManga = false;
+      let hasParent = false;
+
+      for (const f of childFolders()!) {
+        if (f.is_manga_folder) {
+          hasManga = true;
+        } else {
+          hasParent = true;
+        }
+        if (hasManga && hasParent) {
+          break;
+        }
+      }
+
+      sethasMangaFolders(hasManga);
+      setHasParentFolders(hasParent);
+      //console.log(childFolders());
+    }
+  });
+
+  // 1. Handle hydration logic separately
   createEffect(async () => {
-    if (
-      !hasInitialized()
-      && folderPath()
-      && mainParentFolder()
-      && user()
-      && childFolders()
-    ) {
-      const is_refetch = await
-        upsert_read_os_dir(
-          mainParentFolder()?.path!,
-          mainParentFolder()?.parent_path,
-          user()?.id!,
-          childFolders()!,
-          undefined
-        );
-      console.log(is_refetch);
+    if (!hasFullyHydrated() && folderPath() && mainParentFolder() && user() && childFolders.state === "ready" && childFolders()) {
+      console.log("sending these childf olders into upsert: ", childFolders());
+      const is_refetch = await upsert_read_os_dir(mainParentFolder()?.path!, mainParentFolder()?.parent_path, user()!, childFolders()!, undefined);
+
       if (is_refetch) {
-        await refetchChildFolders();
-        setHasInitialized(true);
+        console.log("stale values detected, refreshing...");
+        setHasFullyHydrated(true);
+        await refetchChildFolders(); // Refetch if values are stale
       }
     }
   });
 
   return (
     <main class="w-full h-[100vh] relative overflow-auto" style={{ "scrollbar-gutter": "stable" }}>
-      <NavBar />
+      <NavBar showHiddenFolders={showHiddenChildFolders} setShowHiddenFolders={setShowHiddenChildFolders} />
       <Transition
         appear={true}
         onEnter={(el, done) => {
@@ -62,7 +84,7 @@ export default function Library() {
           a.finished.then(done);
         }}
       >
-        <Tabs defaultValue="volumes" class="w-full" orientation="horizontal">
+        <Tabs class="w-full" orientation="horizontal">
           <Show when={mainParentFolder.state === "ready" && user.state === "ready"}>
             <Transition
               appear={true}
@@ -75,20 +97,47 @@ export default function Library() {
                 a.finished.then(done);
               }}
             >
-              <LibraryHeader mainParentFolder={mainParentFolder} user={user} />
+              <LibraryHeader mainParentFolder={mainParentFolder} user={user} lastReadMangaFolder={lastReadMangaFolder} />
             </Transition>
             <TabsList class="w-full h-9 border">
               <Show when={childFolders()}>
-                <TabsTrigger value="volumes" class="w-fit lg:text-base folders flex flex-row gap-x-0.5">
-                  Volumes
-                  <IconFolderFilled class="ml-0.5 w-3 stroke-[2.4px]" />
-                </TabsTrigger>
+                <Show when={hasMangaFolders()}>
+                  <TabsTrigger value="chapters" class="w-fit lg:text-base folders flex flex-row gap-x-0.5">
+                    Chapters
+                    <IconFolderFilled class="ml-0.5 w-3 stroke-[2.4px]" />
+                  </TabsTrigger>
+                </Show>
+                <Show when={hasParentFolders()}>
+                  <TabsTrigger value="volumes" class="w-fit lg:text-base folders flex flex-row gap-x-0.5">
+                    Volumes
+                    <IconFolderFilled class="ml-0.5 w-3 stroke-[2.4px]" />
+                  </TabsTrigger>
+                </Show>
               </Show>
               <TabsIndicator />
             </TabsList>
             <Show when={childFolders()}>
+              <TabsContent value="chapters">
+                <LibraryFoldersSection
+                  user={user}
+                  mainParentFolder={mainParentFolder}
+                  childFolders={childFolders}
+                  refetchChildFolders={refetchChildFolders}
+                  showHiddenChildFolders={showHiddenChildFolders}
+                  folderSectionType="manga"
+                  folderPath={folderPath}
+                />
+              </TabsContent>
               <TabsContent value="volumes">
-                <LibraryFoldersSection user={user} mainParentFolder={mainParentFolder} childFolders={childFolders} />
+                <LibraryFoldersSection
+                  user={user}
+                  mainParentFolder={mainParentFolder}
+                  childFolders={childFolders}
+                  refetchChildFolders={refetchChildFolders}
+                  showHiddenChildFolders={showHiddenChildFolders}
+                  folderSectionType="parent"
+                  folderPath={folderPath}
+                />
               </TabsContent>
             </Show>
           </Show>

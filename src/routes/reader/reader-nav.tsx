@@ -2,7 +2,7 @@ import { IconAdjustments, IconArrowNarrowLeftDashed, IconColumns1, IconColumns2,
 import { A, useNavigate } from "@solidjs/router";
 import { Accessor, createSignal, onCleanup, onMount, Resource, Setter, Show } from "solid-js";
 import { MangaPanel, OsFolder, UserType } from "../../models";
-import { update_os_folders } from "../../tauri-cmds/os_folders";
+import update_os_folders from "../../tauri-cmds/os_folders/update_os_folders";
 
 export default function ReaderNavbar({
   user,
@@ -28,7 +28,7 @@ export default function ReaderNavbar({
   panelIndex: Accessor<number>;
   isDoublePanels: Accessor<boolean>;
   setPanelIndex: Setter<number>,
-  setCurrentMangaFolder: Setter<OsFolder | null | undefined>
+  setCurrentMangaFolder: Setter<OsFolder | undefined>
   handleSetDoublePanels(): Promise<void>;
   handleSetFirstPanel: () => Promise<void>;
   handleSetLastPanel: () => Promise<void>;
@@ -157,7 +157,7 @@ export default function ReaderNavbar({
   });
 
   return (
-    <nav class="md:px-[115px] lg:px-[148px] xl:px-[200px] w-full h-8 bg-primary shadow-md z-[100] mb-0.5">
+    <nav class="md:px-[115px] lg:px-[148px] xl:px-[200px] w-full h-8 bg-primary shadow-md z-50">
       <ul class="h-full w-full flex flex-row items-center justify-between relative">
         <div class="w-fit flex flex-row h-full">
           <li

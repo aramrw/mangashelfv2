@@ -1,5 +1,5 @@
 import { OsFolder, UserType } from "../../models";
-import { Accessor, Setter, Show } from "solid-js";
+import { Accessor, Resource, Setter, Show } from "solid-js";
 import {
   ContextMenuContent,
   ContextMenuItem,
@@ -10,19 +10,24 @@ import {
 } from "../../components/ui/context-menu";
 import { Platform } from '@tauri-apps/plugin-os';
 import show_in_folder from "../../tauri-cmds/show_in_folder";
-import { delete_os_folders } from "../../tauri-cmds/os_folders";
-import { IconBackspace, IconFolderSearch } from "@tabler/icons-solidjs";
+import { IconBackspace, IconBrandFinder, IconFolderSearch } from "@tabler/icons-solidjs";
+import IconHeroEye from "../../main-components/icons/icon-hero-eye";
+import IconHeroSlashEye from "../../main-components/icons/icon-hero-slash-eye";
+import delete_os_folders from "../../tauri-cmds/os_folders/delete_os_folders";
+import update_os_folders from "../../tauri-cmds/os_folders/update_os_folders";
 
 
 export default function FolderCardContextMenuContent({
   folder,
   user,
   refetch,
-  currentPlatform
+  currentPlatform,
+  isLastReadMangaFolder,
 }: {
   folder: OsFolder;
-  user: Accessor<UserType | null> | undefined;
-  refetch?: (info?: unknown) => OsFolder[] | Promise<OsFolder[] | undefined> | null | undefined;
+  user: Accessor<UserType | null> | Resource<UserType | null>;
+  isLastReadMangaFolder?: boolean;
+  refetch: (info?: unknown) => OsFolder[] | Promise<OsFolder[] | null | undefined> | null | undefined
   currentPlatform: Platform;
 }) {
   return (
@@ -32,36 +37,60 @@ export default function FolderCardContextMenuContent({
           fallback={
             <div class="flex flex-row justify-center items-center gap-1">
               Open in Finder
-              <IconFolderSearch class="h-auto w-4" />
+              <IconBrandFinder class="h-auto w-4" />
             </div>
           }
         >
           <div class="flex flex-row justify-center items-center gap-1">
             Open in Explorer
-            <IconFolderSearch class="h-auto w-4" />
+            <IconFolderSearch class="h-auto w-5" />
           </div>
         </Show>
       </ContextMenuItem>
-      <Show when={user && user()}>
+      <ContextMenuSub>
         <ContextMenuSeparator />
-        <ContextMenuSub>
-          <ContextMenuSubTrigger inset>Edit</ContextMenuSubTrigger>
-          <ContextMenuSubContent class="w-fit ml-2">
-            <ContextMenuItem class="flex flex-row items-center gap-0.5"
-              onClick={() => {
-                if (user && refetch) {
-                  delete_os_folders([folder], user()!.id!).then(() => {
-                    refetch();
-                  });
+        <ContextMenuSubTrigger inset>Edit</ContextMenuSubTrigger>
+        <ContextMenuSubContent class="w-fit ml-2">
+          <Show when={user && user()}>
+            <ContextMenuItem
+              onClick={async () => {
+                if (user && user() && refetch) {
+                  const folderClone = structuredClone(folder);
+                  folderClone.is_hidden = !folder.is_hidden;
+                  await update_os_folders([folderClone], user()!);
+                  refetch();
                 }
-              }}
+              }
+              }
             >
-              Remove
-              <IconBackspace class="h-auto w-4" />
+              <Show when={!folder.is_hidden}
+                fallback={
+                  <>
+                    Unhide
+                    <IconHeroEye class="h-auto w-4" />
+                  </>
+                }
+              >
+                Hide
+                <IconHeroSlashEye class="h-auto w-4" />
+              </Show>
             </ContextMenuItem>
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-      </Show>
-    </ContextMenuContent>
+            <Show when={isLastReadMangaFolder !== true}>
+              <ContextMenuItem
+                onClick={async () => {
+                  if (user && user() && refetch) {
+                    await delete_os_folders([folder], user()!);
+                    refetch();
+                  }
+                }}
+              >
+                Remove
+                <IconBackspace class="h-auto w-5" />
+              </ContextMenuItem>
+            </Show>
+          </Show>
+        </ContextMenuSubContent>
+      </ContextMenuSub >
+    </ContextMenuContent >
   )
 }

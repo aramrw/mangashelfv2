@@ -1,24 +1,31 @@
 import "../App.css";
-import { IconAdjustments, IconArrowNarrowLeftDashed, IconChalkboard, IconDeviceDesktopAnalytics, IconList, IconMenu } from "@tabler/icons-solidjs";
+import { IconAdjustments, IconArrowNarrowLeftDashed, IconChalkboard, IconDeviceDesktopAnalytics, IconEye, IconEyeX, IconList, IconMenu } from "@tabler/icons-solidjs";
 import {
   Sheet,
   SheetContent,
   SheetTrigger
 } from "../components/ui/sheet";
 import { A, useNavigate } from "@solidjs/router";
+import { Accessor, Setter, Show } from "solid-js";
 
-export default function NavBar() {
+export default function NavBar({
+  showHiddenFolders,
+  setShowHiddenFolders,
+}: {
+  showHiddenFolders: Accessor<boolean> | undefined;
+  setShowHiddenFolders: Setter<boolean> | undefined;
+}) {
 
-	const navigate = useNavigate();
-	
+  const navigate = useNavigate();
+
   return (
     <nav class="sm:px-2 md:px-16 lg:px-36 xl:px-44 w-full h-8 bg-primary shadow-md z-[100]">
       <ul class="h-full w-full flex flex-row items-center justify-between">
         <Sheet>
           <div class="flex flex-row h-full">
             <li class="px-1 h-full flex flex-row justify-center items-center hover:bg-accent transition-colors cursor-pointer"
-						onClick={() => navigate(-1)}
-					>
+              onClick={() => navigate(-1)}
+            >
               <IconArrowNarrowLeftDashed class="text-secondary fill-accent stroke-[2]" />
             </li>
             <SheetTrigger class="h-full outline-none">
@@ -34,20 +41,22 @@ export default function NavBar() {
                   <IconChalkboard class="text-secondary fill-accent stroke-[1.5]" />
                 </A>
               </li>
-              <li class="p-1 w-5 h-full flex flex-row justify-center items-center">
-              </li>
+              <li class="p-1 w-5 h-full flex flex-row justify-center items-center" />
+              <Show when={setShowHiddenFolders && showHiddenFolders}>
+                <li class="p-1 h-full flex flex-row justify-center items-center hover:bg-accent transition-colors cursor-pointer"
+                  onClick={() => setShowHiddenFolders!((prev) => !prev)}
+                >
+                  <Show when={!showHiddenFolders!()}
+                    fallback={
+                      <IconEyeX class="text-secondary stroke-[1.6]" />
+                    }
+                  >
+                    <IconEye class="text-secondary stroke-[1.6]" />
+                  </Show>
+                </li>
+              </Show>
               <li class="p-1 h-full flex flex-row justify-center items-center hover:bg-accent transition-colors cursor-pointer">
                 <IconList class="text-secondary fill-accent stroke-[2]" />
-              </li>
-              <li class="p-1 h-full flex flex-row justify-center items-center hover:bg-accent transition-colors cursor-pointer">
-                <svg xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24" fill="none" stroke-width="1.5"
-                  stroke-linecap="round" stroke-linejoin="round" class="h-6 w-auto stroke-secondary p-0.5">
-                  <path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z" />
-                  <path d="m6.2 5.3 3.1 3.9" />
-                  <path d="m12.4 3.4 3.1 4" />
-                  <path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
-                </svg>
               </li>
             </ul>
           </SheetContent>
@@ -63,6 +72,6 @@ export default function NavBar() {
           </li>
         </div>
       </ul>
-    </nav>
+    </nav >
   );
 }

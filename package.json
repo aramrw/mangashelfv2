@@ -1,6 +1,6 @@
 {
   "name": "mangashelf",
-  "version": "0.2.2",
+  "version": "0.3.1",
   "description": "",
   "type": "module",
   "scripts": {
@@ -24,6 +24,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "solid-js": "^1.7.8",
+    "solid-theme-provider": "^0.10.0",
     "solid-transition-group": "^0.2.3",
     "tailwind-merge": "^2.5.4",
     "tailwindcss-animate": "^1.0.7"

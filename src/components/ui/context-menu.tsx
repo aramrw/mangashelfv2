@@ -136,7 +136,7 @@ export const ContextMenuItem = <T extends ValidComponent = "div">(
   return (
     <ContextMenuPrimitive.Item
       class={cn(
-        "font-medium relative flex cursor-default select-none items-center rounded-sm px-1 py-0.5 text-sm outline-none focus:bg-muted focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "font-medium relative flex flex-row justify-between cursor-default select-none items-center rounded-sm px-1 py-0.5 text-sm outline-none focus:bg-muted focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         local.inset && "pl-8",
         local.class,
       )}
