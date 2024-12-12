@@ -6,7 +6,7 @@ import get_user_by_id from "../../tauri-cmds/get_user_by_id";
 import { get_panels } from "../../tauri-cmds/get_panels";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight } from "@tabler/icons-solidjs";
-import { update_os_folders } from "../../tauri-cmds/os_folders";
+import update_os_folders from "../../tauri-cmds/os_folders/update_os_folders";
 import { MangaPanel, OsFolder } from "../../models";
 import { Transition } from "solid-transition-group";
 import { cn } from "../../libs/cn";
@@ -29,16 +29,18 @@ export default function MangaReader() {
   const [isfullyHydrated, setIsFullyHydrated] = createSignal(false);
   const [hasInitialized, setHasInitialized] = createSignal(false);
 
-  createEffect(() => {
-    console.log(currentMangaFolder());
-  });
-
   // hydrates stale folders
   createEffect(async () => {
     if (!isfullyHydrated() && folderPath() && currentMangaFolder() && user() && panels()) {
-      const is_refetch = await upsert_read_os_dir(currentMangaFolder()?.path!, currentMangaFolder()?.parent_path, user()?.id!, undefined, panels()!);
+      const is_refetch = await
+        upsert_read_os_dir(
+          currentMangaFolder()?.path!,
+          currentMangaFolder()?.parent_path,
+          user()!,
+          undefined,
+          panels()!
+        );
       if (is_refetch) {
-        console.log("the panels are stale, refetching...");
         await refetchPanels();
       }
       setIsFullyHydrated(true);
@@ -48,10 +50,10 @@ export default function MangaReader() {
   // makes sure everything is ready on startup
   createEffect(() => {
     if (currentMangaFolder.state === "ready" && panels.state === "ready" && !hasInitialized() && isfullyHydrated()) {
-      // Set zoom and double panels from the current folder
+      // set zoom and double panels from the current folder
       setIsDoublePanels(currentMangaFolder()?.is_double_panels!);
 
-      // Find the panel index based on last read panel path
+      // find the panel index based on last read panel path
       for (let i = 0; i < panels()!.length; i++) {
         if (panels()![i].path === currentMangaFolder()?.last_read_panel?.path) {
           setPanelIndex(i);
@@ -60,20 +62,24 @@ export default function MangaReader() {
         }
       }
 
-      // Mark initialization as complete so this effect doesn't run again
+      // mark initialization as complete so this effect doesn't run again
       setHasInitialized(true);
     }
   });
 
   const CURRENT_PANELS = () => ({
-    // For right-to-left reading, the "first" (right) panel is the current index
+    // for right-to-left reading, the "first" (right) panel is the current index
     first: panels()?.[panelIndex()],
-    // The "second" (left) panel is the next index in double panel mode
+    // the "second" (left) panel is the next index in double panel mode
     second: isDoublePanels() ? panels()?.[panelIndex() + 1] : null,
   });
 
   const handleUpdateFolders = async () => {
-    if (currentMangaFolder.state === "ready" && panelIndex() !== undefined && panels.state === "ready" && user.state === "ready") {
+    if (currentMangaFolder.state === "ready"
+      && panelIndex() !== undefined
+      && panels.state === "ready"
+      && user.state === "ready"
+    ) {
       let newFolder = structuredClone(currentMangaFolder()!);
       newFolder.last_read_panel = panels()![panelIndex()];
 
@@ -87,14 +93,31 @@ export default function MangaReader() {
 
       if (parentFolder.state === "ready" && parentFolder()) {
         let newParentFolder = structuredClone(parentFolder()!);
-        // set the last read panel
         newParentFolder.last_read_panel = panels()![panelIndex()];
-        // set the folders status as fully read
-        foldersToUpdate.push(newParentFolder);
+        // this should be moved to rust because it calls rust functions anyway
+        if (newParentFolder.parent_path) {
+          const SUPER_PARENT = await getOutermostParentFolder(newParentFolder);
+          if (SUPER_PARENT.path !== newParentFolder.path) {
+            SUPER_PARENT.last_read_panel = panels()![panelIndex()];
+            foldersToUpdate.push(newParentFolder);
+          }
+        }
       }
       setCurrentMangaFolder(newFolder);
-      await update_os_folders(foldersToUpdate, user()!.id);
+      await update_os_folders(foldersToUpdate, user()!);
+      console.log("updated folders:", foldersToUpdate);
     }
+  };
+
+  async function getOutermostParentFolder(folder: OsFolder) {
+    // Base case: if the folder has no parent, it's the outermost
+    if (!folder.parent_path) {
+      return folder;
+    }
+
+    // Otherwise, recursively fetch the parent folder
+    const parent = await get_os_folder_by_path(folder.parent_path);
+    return getOutermostParentFolder(parent);
   };
 
   async function handleSetDoublePanels() {
@@ -104,7 +127,7 @@ export default function MangaReader() {
       let newFolder = structuredClone(currentMangaFolder());
       if (newFolder) {
         newFolder.is_double_panels = isDoublePanels();
-        await update_os_folders([newFolder], user()!.id).then(() => {
+        await update_os_folders([newFolder], user()!).then(() => {
           setCurrentMangaFolder(newFolder);
         });
       }
@@ -251,7 +274,7 @@ export default function MangaReader() {
                     {(panel, i) => {
                       return (
                         <Show when={i() >= panelIndex() - 10 && i() <= panelIndex() + 10}>
-                          <RenderPanel panel={panel} isDoublePanels={isDoublePanels} panelIndex={panelIndex} i={i} />
+                          < RenderPanel panel={panel} isDoublePanels={isDoublePanels} panelIndex={panelIndex} i={i} />
                         </Show>
                       );
                     }}
@@ -389,6 +412,7 @@ function RenderPanel({
     <img
       src={convertFileSrc(panel.path)}
       alt={panel.title || "Panel"}
+      decoding="async"
       class={cn(
         "select-none bg-black will-change-auto object-contain max-h-[calc(100vh-37px)]",
         isCurrent() || isNext() ? "opacity-100 z-20" : "opacity-[0.002]",
