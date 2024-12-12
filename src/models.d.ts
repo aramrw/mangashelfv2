@@ -2,6 +2,7 @@ export type UserType = {
   id: string;
   username: string;
   settings: SettingsType;
+  last_read_manga_folder: OsFolder | undefined;
 }
 
 export type SettingsType = {
@@ -24,7 +25,7 @@ export type OsFolder = {
   parent_path: string | undefined;
   last_read_panel: MangaPanel | undefined;
   cover_img_path: string | undefined;
-	metadata: FolderMetadata;
+  metadata: FolderMetadata;
   is_manga_folder: boolean;
   is_double_panels: boolean;
   is_read: boolean;
@@ -54,7 +55,7 @@ export type FileMetadata = {
 
 export type FolderMetadata = {
   contains: FolderContains;
-	size: number;
+  size: number;
 }
 
 export type FolderContains = {
@@ -62,3 +63,4 @@ export type FolderContains = {
   folders: number;
 }
 
+export type SortType = "none" | "alphabet" | "numbers" | "updated";
