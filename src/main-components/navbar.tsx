@@ -12,8 +12,8 @@ export default function NavBar({
   showHiddenFolders,
   setShowHiddenFolders,
 }: {
-  showHiddenFolders: Accessor<boolean>;
-  setShowHiddenFolders: Setter<boolean>;
+  showHiddenFolders: Accessor<boolean> | undefined;
+  setShowHiddenFolders: Setter<boolean> | undefined;
 }) {
 
   const navigate = useNavigate();
@@ -42,17 +42,19 @@ export default function NavBar({
                 </A>
               </li>
               <li class="p-1 w-5 h-full flex flex-row justify-center items-center" />
-              <li class="p-1 h-full flex flex-row justify-center items-center hover:bg-accent transition-colors cursor-pointer"
-                onClick={() => setShowHiddenFolders((prev) => !prev)}
-              >
-                <Show when={!showHiddenFolders()}
-                  fallback={
-                    <IconEyeX class="text-secondary stroke-[1.6]" />
-                  }
+              <Show when={setShowHiddenFolders && showHiddenFolders}>
+                <li class="p-1 h-full flex flex-row justify-center items-center hover:bg-accent transition-colors cursor-pointer"
+                  onClick={() => setShowHiddenFolders!((prev) => !prev)}
                 >
-                  <IconEye class="text-secondary stroke-[1.6]" />
-                </Show>
-              </li>
+                  <Show when={!showHiddenFolders!()}
+                    fallback={
+                      <IconEyeX class="text-secondary stroke-[1.6]" />
+                    }
+                  >
+                    <IconEye class="text-secondary stroke-[1.6]" />
+                  </Show>
+                </li>
+              </Show>
               <li class="p-1 h-full flex flex-row justify-center items-center hover:bg-accent transition-colors cursor-pointer">
                 <IconList class="text-secondary fill-accent stroke-[2]" />
               </li>
