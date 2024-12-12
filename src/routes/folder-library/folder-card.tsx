@@ -30,11 +30,11 @@ const LibraryFolderCard = ({
     <Transition
       appear={true}
       onEnter={(el, done) => {
-        const a = el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 800 });
+        const a = el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 100 });
         a.finished.then(done);
       }}
       onExit={(el, done) => {
-        const a = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 800 });
+        const a = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 100 });
         a.finished.then(done);
       }}
     >
@@ -53,7 +53,9 @@ const LibraryFolderCard = ({
             <Show when={folder.cover_img_path}>
               <img
                 src={folder.cover_img_path && convertFileSrc(folder.cover_img_path)}
-                class={cn("object-cover w-full h-full relative select-none object-top", folder.is_read && "brightness-[0.3]")}
+                class={cn("object-cover w-full h-full relative select-none object-top",
+                  (folder.is_read || folder.is_hidden) ? "brightness-[0.7]" : ""
+                )}
               />
             </Show>
 
@@ -75,7 +77,7 @@ const LibraryFolderCard = ({
             </Show>
             <Show when={folder.is_read && !folder.is_hidden}>
               <IconBookFilled
-                class="h-[40%] w-fit bg-primary/80 rounded-md absolute p-1 opacity-90
+                class="h-[40%] w-fit bg-primary rounded-md absolute p-1 opacity-60
 									group-hover:opacity-0 transition-all duration-300 fill-secondary"
               />
             </Show>
