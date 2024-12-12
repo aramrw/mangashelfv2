@@ -2,10 +2,12 @@ use std::{
     fs::{self, read_dir},
     io,
     path::{Path, PathBuf},
+    str::FromStr,
     sync::LazyLock,
     time::{Duration, SystemTime},
 };
 
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use data::v1::{MangaPanel, MangaPanelKey, OsFolder, OsFolderKey, User};
 use native_db::*;
 use rayon::slice::ParallelSliceMut;
@@ -14,8 +16,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{command, AppHandle, Manager};
 
 use crate::{
-    error::{DatabaseError, ReadDirError},
-    fs::HasPath,
+    error::{DatabaseError, ReadDirError, SortTypeError},
     misc::get_date_time,
 };
 
@@ -118,6 +119,7 @@ pub mod data {
 
         use super::*;
 
+        /// mangashelf user type
         #[derive(Serialize, Deserialize, Debug)]
         #[native_model(id = 1, version = 1)]
         #[native_db]
@@ -127,6 +129,7 @@ pub mod data {
             #[secondary_key(unique)]
             pub username: String,
             pub settings: Settings,
+            pub last_read_manga_folder: Option<OsFolder>,
         }
 
         #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -195,6 +198,32 @@ static DBMODELS: LazyLock<Models> = LazyLock::new(|| {
     models
 });
 
+pub trait HasPath {
+    fn path(&self) -> &str;
+}
+
+pub trait HasTitle {
+    fn title(&self) -> &str;
+}
+
+pub trait HasDatetime {
+    fn date(&self) -> &str;
+    fn time(&self) -> &str;
+    fn get_naive_datetime(&self) -> Result<NaiveDateTime, chrono::ParseError> {
+        let date = &self.date(); // "2024-11-30"
+        let mut time = self.time().to_string(); // "10:43pm"
+
+        time.replace_range(time.len() - 2.., "");
+
+        let naive_date = NaiveDate::parse_from_str(date, "%Y-%m-%d")?;
+        let naive_time = NaiveTime::parse_from_str(&time, "%H:%M")?;
+
+        // Return combined NaiveDateTime
+        Ok(NaiveDateTime::new(naive_date, naive_time))
+    }
+}
+
+// path
 impl HasPath for OsFolder {
     fn path(&self) -> &str {
         self.path.as_ref()
@@ -204,6 +233,38 @@ impl HasPath for OsFolder {
 impl HasPath for MangaPanel {
     fn path(&self) -> &str {
         self.path.as_ref()
+    }
+}
+
+// title
+impl HasTitle for OsFolder {
+    fn title(&self) -> &str {
+        self.title.as_ref()
+    }
+}
+
+impl HasTitle for MangaPanel {
+    fn title(&self) -> &str {
+        self.title.as_ref()
+    }
+}
+
+// datetime
+impl HasDatetime for OsFolder {
+    fn date(&self) -> &str {
+        &self.update_date
+    }
+    fn time(&self) -> &str {
+        &self.update_time
+    }
+}
+
+impl HasDatetime for MangaPanel {
+    fn date(&self) -> &str {
+        &self.update_date
+    }
+    fn time(&self) -> &str {
+        &self.update_time
     }
 }
 
@@ -305,8 +366,68 @@ pub fn init_database(app_data_dir: &Path, handle: &AppHandle) -> Result<(), db_t
     Ok(())
 }
 
+// sort type
+
+#[non_exhaustive]
+#[derive(Debug, Clone)]
+pub enum SortType {
+    None,
+    EpisodeTitleRegex,
+    Updated,
+}
+
+impl SortType {
+    pub fn sort<T>(&self) -> impl Fn(&T, &T) -> std::cmp::Ordering
+    where
+        T: HasDatetime + HasTitle,
+    {
+        match self {
+            SortType::Updated => |a: &T, b: &T| {
+                let a_dt = a.get_naive_datetime().unwrap_or_default();
+                let b_dt = b.get_naive_datetime().unwrap_or_default();
+                //println!("a_dt: {:?}, b_dt: {:?}", a_dt, b_dt);
+                b_dt.cmp(&a_dt)
+            },
+            SortType::EpisodeTitleRegex => |a: &T, b: &T| {
+                let num_a = EPISODE_TITLE_REGEX
+                    .captures(a.title())
+                    .and_then(|caps| caps.get(caps.len() - 1))
+                    .and_then(|m| m.as_str().parse::<u32>().ok())
+                    .unwrap_or(0);
+
+                let num_b = EPISODE_TITLE_REGEX
+                    .captures(b.title())
+                    .and_then(|caps| caps.get(caps.len() - 1))
+                    .and_then(|m| m.as_str().parse::<u32>().ok())
+                    .unwrap_or(0);
+
+                num_a.cmp(&num_b)
+            },
+            _ => |_: &T, _: &T| std::cmp::Ordering::Equal,
+        }
+    }
+}
+
+impl FromStr for SortType {
+    type Err = SortTypeError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "none" => Ok(Self::None),
+            "episode_title_regex" => Ok(Self::EpisodeTitleRegex),
+            "updated" => Ok(Self::Updated),
+            _ => Err(SortTypeError::FromStr(s.to_string())),
+        }
+    }
+}
+
+// tauri cmds
+
 #[command]
-pub fn get_os_folders(handle: AppHandle, user_id: String) -> Result<Vec<OsFolder>, DatabaseError> {
+pub fn get_os_folders(
+    handle: AppHandle,
+    user_id: String,
+    sort_type: String,
+) -> Result<Vec<OsFolder>, DatabaseError> {
     let db_path = handle.state::<PathBuf>().to_string_lossy().to_string();
     let db = Builder::new().create(&DBMODELS, db_path)?;
 
@@ -318,6 +439,8 @@ pub fn get_os_folders(handle: AppHandle, user_id: String) -> Result<Vec<OsFolder
         .try_collect()?;
 
     folders.retain(|folder| folder.parent_path.is_none());
+    let sort_type = SortType::from_str(&sort_type)?;
+    folders.par_sort_by(sort_type.sort());
 
     if folders.is_empty() {
         return Err(DatabaseError::OsFoldersNotFound(format!(
@@ -352,6 +475,7 @@ pub fn get_os_folder_by_path(
 pub fn get_os_folders_by_path(
     handle: AppHandle,
     parent_path: String,
+    sort_type: String,
 ) -> Result<Vec<OsFolder>, DatabaseError> {
     let db_path = handle.state::<PathBuf>().to_string_lossy().to_string();
     let db = Builder::new().create(&DBMODELS, db_path)?;
@@ -371,22 +495,8 @@ pub fn get_os_folders_by_path(
         )));
     }
 
-    folders.par_sort_by(|a, b| {
-        // Extract the episode number from the title using regex
-        let num_a = EPISODE_TITLE_REGEX
-            .captures(&a.title)
-            .and_then(|caps| caps.get(1)) // Assuming the first capturing group contains the episode number
-            .and_then(|m| m.as_str().parse::<u32>().ok())
-            .unwrap_or(0);
-
-        let num_b = EPISODE_TITLE_REGEX
-            .captures(&b.title)
-            .and_then(|caps| caps.get(1))
-            .and_then(|m| m.as_str().parse::<u32>().ok())
-            .unwrap_or(0);
-
-        num_a.cmp(&num_b)
-    });
+    let sort_type = SortType::from_str(&sort_type)?;
+    folders.par_sort_by(sort_type.sort());
 
     Ok(folders)
 }
@@ -395,22 +505,33 @@ pub fn get_os_folders_by_path(
 pub fn update_os_folders(
     handle: AppHandle,
     os_folders: Vec<OsFolder>,
+    user: Option<User>,
 ) -> Result<(), DatabaseError> {
     let db_path = handle.state::<PathBuf>().to_string_lossy().to_string();
     let db = Builder::new().open(&DBMODELS, db_path)?;
-    let rtx = db.rw_transaction()?;
+    let rwtx = db.rw_transaction()?;
     let (date, time) = get_date_time();
 
-    for mut folder in os_folders {
-        //println!("updating dir: {}", folder.path);
+    // the user only gets passed from the reader
+    // meaning that we should update the last nested folder read
+    // to display on the dashboard
+    if let Some(mut user) = user {
+        user.last_read_manga_folder = os_folders.first().cloned();
+        // println!(
+        //     "updating the users last read manga folder to: {:#?}",
+        //     user.last_read_manga_folder,
+        // );
+        rwtx.upsert(user)?;
+    }
 
+    for mut folder in os_folders {
         folder.update_date = date.clone();
         folder.update_time = time.clone();
 
-        rtx.upsert(folder)?;
+        rwtx.upsert(folder)?;
     }
 
-    rtx.commit()?;
+    rwtx.commit()?;
 
     Ok(())
 }
@@ -467,22 +588,7 @@ pub fn get_panels(
         )));
     }
 
-    panels.sort_by(|a, b| {
-        // Extract the episode number from the title using regex
-        let num_a = EPISODE_TITLE_REGEX
-            .captures(&a.title)
-            .and_then(|caps| caps.get(1)) // Assuming the first capturing group contains the episode number
-            .and_then(|m| m.as_str().parse::<u32>().ok())
-            .unwrap_or(0);
-
-        let num_b = EPISODE_TITLE_REGEX
-            .captures(&b.title)
-            .and_then(|caps| caps.get(1))
-            .and_then(|m| m.as_str().parse::<u32>().ok())
-            .unwrap_or(0);
-
-        num_a.cmp(&num_b)
-    });
+    panels.par_sort_by(SortType::sort(&SortType::EpisodeTitleRegex));
 
     //println!("{:#?}", folders);
 
@@ -507,11 +613,11 @@ pub fn delete_panels(handle: &AppHandle, panels: Vec<MangaPanel>) -> Result<(), 
 pub fn delete_os_folders(
     handle: AppHandle,
     os_folders: Vec<OsFolder>,
+    mut user: Option<User>,
 ) -> Result<(), DatabaseError> {
     let app_data_dir = handle.path().app_data_dir()?;
     let db_path = handle.state::<PathBuf>().to_string_lossy().to_string();
     let db = Builder::new().open(&DBMODELS, db_path)?;
-
     let rwtx = db.rw_transaction()?;
 
     for folder in os_folders {
@@ -536,6 +642,15 @@ pub fn delete_os_folders(
 
         // Delete all child folders
         for f in child_folders {
+            if let Some(ref mut user) = user {
+                if let Some(lrmf) = &user.last_read_manga_folder {
+                    if f.path == lrmf.path {
+                        println!("the last read user folder is one that needs to be deleted");
+                        user.last_read_manga_folder = None;
+                    }
+                }
+            }
+
             rwtx.remove(f)?;
         }
 
@@ -543,10 +658,23 @@ pub fn delete_os_folders(
             .delete_app_data_cover_folder(&app_data_dir)
             .map_err(|e| DatabaseError::DeleteCoverFolder(folder.path.clone(), e.to_string()))?;
 
+        if let Some(ref mut user) = user {
+            if let Some(lrmf) = &user.last_read_manga_folder {
+                if folder.path == lrmf.path {
+                    println!("the last read user folder is one that needs to be deleted");
+                    user.last_read_manga_folder = None;
+                }
+            }
+        }
+
         // Finally, delete the folder itself
         rwtx.remove(folder)?;
     }
 
+    if let Some(user) = user {
+        //dbg!(&user);
+        rwtx.upsert(user)?;
+    }
     rwtx.commit()?;
 
     Ok(())
@@ -608,22 +736,7 @@ pub fn get_prev_folder(
         )));
     }
 
-    folders.sort_by(|a, b| {
-        // Extract the episode number from the title using regex
-        let num_a = EPISODE_TITLE_REGEX
-            .captures(&a.title)
-            .and_then(|caps| caps.get(1)) // Assuming the first capturing group contains the episode number
-            .and_then(|m| m.as_str().parse::<u32>().ok())
-            .unwrap_or(0);
-
-        let num_b = EPISODE_TITLE_REGEX
-            .captures(&b.title)
-            .and_then(|caps| caps.get(1))
-            .and_then(|m| m.as_str().parse::<u32>().ok())
-            .unwrap_or(0);
-
-        num_a.cmp(&num_b)
-    });
+    folders.par_sort_by(SortType::sort(&SortType::EpisodeTitleRegex));
 
     match folders
         .into_iter()
@@ -660,22 +773,7 @@ pub fn get_next_folder(
         )));
     }
 
-    folders.sort_by(|a, b| {
-        // Extract the episode number from the title using regex
-        let num_a = EPISODE_TITLE_REGEX
-            .captures(&a.title)
-            .and_then(|caps| caps.get(1)) // Assuming the first capturing group contains the episode number
-            .and_then(|m| m.as_str().parse::<u32>().ok())
-            .unwrap_or(0);
-
-        let num_b = EPISODE_TITLE_REGEX
-            .captures(&b.title)
-            .and_then(|caps| caps.get(1))
-            .and_then(|m| m.as_str().parse::<u32>().ok())
-            .unwrap_or(0);
-
-        num_a.cmp(&num_b)
-    });
+    folders.par_sort_by(SortType::sort(&SortType::EpisodeTitleRegex));
 
     match folders
         .into_iter()
