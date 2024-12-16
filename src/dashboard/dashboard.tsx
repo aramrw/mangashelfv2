@@ -1,10 +1,15 @@
 import { createResource, createSignal, For, Show } from "solid-js";
-import NavBar from "../main-components/navbar";
 import { OsFolder, UserType } from "../models";
 import AddNewSkeleton from "./components/add-new-skeleton";
 import { get_os_folders } from "../tauri-cmds/os_folders/get_os_folders";
 import get_default_user from "../tauri-cmds/users";
 import OsFolderCard from "./components/os-folder-card";
+import NavBar from "../main-components/navbar/navbar";
+
+const SECTION_CLASS = `
+	flex flex-row flex-wrap gap-2.5 
+	px-3 md:px-16 lg:px-28 xl:px-60
+`
 
 export default function Dashboard() {
   const [user, setUser] = createSignal<UserType | null>(null);
@@ -27,8 +32,9 @@ export default function Dashboard() {
       <section class="h-fit w-full flex flex-row gap-2">
         <Show when={user() && osFolders.state === "ready"}>
           <div class="w-full flex flex-col gap-2 pt-3.5">
-            <section id="manga_folders_section"
-              class="flex flex-row flex-wrap gap-2.5 px-3 md:px-16 lg:px-28 xl:px-44"
+            <section
+              id="manga_folders_section"
+              class={SECTION_CLASS}
             >
               <AddNewSkeleton user={user} refetch={refetch} />
               <Show when={user()?.last_read_manga_folder}>
@@ -64,10 +70,10 @@ export default function Dashboard() {
                 )}
               </For>
             </section>
-            <div class="w-full h-7 bg-popover shadow-sm my-1.5"></div>
-            <section id="manga_folders_section"
-              class="flex flex-row gap-2.5
-							px-3 md:px-16 lg:px-28 xl:px-44"
+            <div class="w-full h-7 bg-popover shadow-sm my-1.5 outline outline-1 outline-muted"/>
+            <section
+              id="manga_folders_section"
+              class={SECTION_CLASS}
             >
               <For each={osFolders()}>
                 {(folder) => (

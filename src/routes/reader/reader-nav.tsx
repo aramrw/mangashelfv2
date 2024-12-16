@@ -1,8 +1,9 @@
-import { IconAdjustments, IconArrowNarrowLeftDashed, IconColumns1, IconColumns2, IconZoomIn, IconZoomOut } from "@tabler/icons-solidjs";
+import { IconAdjustments, IconArrowNarrowLeftDashed, IconChalkboard, IconColumns1, IconColumns2 } from "@tabler/icons-solidjs";
 import { A, useNavigate } from "@solidjs/router";
 import { Accessor, createSignal, onCleanup, onMount, Resource, Setter, Show } from "solid-js";
 import { MangaPanel, OsFolder, UserType } from "../../models";
-import update_os_folders from "../../tauri-cmds/os_folders/update_os_folders";
+import { NavbarListItem } from "../../main-components/navbar/navbar";
+import ThemeSwitcherButton from "../../main-components/theme/theme_switcher_button";
 
 export default function ReaderNavbar({
   user,
@@ -157,37 +158,62 @@ export default function ReaderNavbar({
   });
 
   return (
-    <nav class="md:px-[115px] lg:px-[148px] xl:px-[200px] w-full h-8 bg-primary shadow-md z-50">
+    <nav class="sm:px-2 md:px-16 lg:px-36 xl:px-72 
+			w-full min-h-8 bg-primary shadow-md z-[21784895]
+			dark:bg-popover"
+    >
       <ul class="h-full w-full flex flex-row items-center justify-between relative">
         <div class="w-fit flex flex-row h-full">
-          <li
-            class="px-1 h-full flex flex-row justify-center items-center hover:bg-accent transition-colors cursor-pointer"
+          <NavbarListItem
             onClick={() => {
               navigate(-1);
             }}
           >
-            <IconArrowNarrowLeftDashed class="text-secondary fill-accent stroke-[2]" />
-          </li>
-          {/* <li class="p-1 w-5 h-full flex flex-row justify-center items-center"></li> */}
-          <li
-            class="px-1 h-full flex flex-row justify-center items-center hover:bg-accent transition-colors cursor-pointer"
-            onClick={async () => await handleSetDoublePanels()}
+            <IconArrowNarrowLeftDashed
+              class="text-secondary dark:text-secondary-foreground 
+							fill-accent stroke-[2]"
+            />
+          </NavbarListItem>
+          <NavbarListItem>
+            <A href="/dashboard">
+              <IconChalkboard
+                class="text-secondary dark:text-secondary-foreground 
+										stroke-[1.5]"
+              />
+            </A>
+          </NavbarListItem>
+
+          <NavbarListItem
+            onClick={async () =>
+              await handleSetDoublePanels()}
           >
             <Show when={isDoublePanels()}
               fallback={
-                <IconColumns2 class="text-secondary fill-accent stroke-[1.5]" />
+                <IconColumns2
+                  class="p-[0.5px] text-secondary dark:text-secondary-foreground stroke-[1.5]"
+                />
               }
             >
-              <IconColumns1 class="text-secondary fill-accent stroke-[1.5]" />
+              <IconColumns1
+                class="p-[0.5px] text-secondary dark:text-secondary-foreground stroke-[1.5]"
+              />
             </Show>
-          </li>
+          </NavbarListItem>
         </div>
-
-        <li class="px-1 h-full flex flex-row justify-center items-center hover:bg-accent transition-colors cursor-pointer">
-          <A href="/settings/default">
-            <IconAdjustments class="text-secondary fill-accent stroke-[1.5]" />
-          </A>
-        </li>
+        <div class="w-fit flex flex-row h-full">
+          <NavbarListItem>
+            <ThemeSwitcherButton />
+          </NavbarListItem>
+          <NavbarListItem>
+            <A href="/settings/default">
+              <IconAdjustments
+                class="
+								text-secondary dark:text-secondary-foreground 
+								stroke-[1.5]"
+              />
+            </A>
+          </NavbarListItem>
+        </div>
       </ul>
     </nav>
   );

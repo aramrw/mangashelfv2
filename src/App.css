@@ -4,7 +4,7 @@
 
 @layer base {
     :root {
-        --background: 0 0% 95%;
+        --background: 0 0% 92%;
         --foreground: 240 10% 5.9%;
 
         --card: 0 0% 100%;
@@ -36,13 +36,13 @@
     }
 
     [data-kb-theme="dark"] {
-        --background: 240 10% 3.9%;
+        --background: 0, 0%, 13.8%;
         --foreground: 0 0% 98%;
 
         --card: 240 10% 3.9%;
         --card-foreground: 0 0% 98%;
 
-        --popover: 240 10% 3.9%;
+        --popover: 240 10% 6.9%;
         --popover-foreground: 0 0% 98%;
 
         --primary: 0 0% 98%;

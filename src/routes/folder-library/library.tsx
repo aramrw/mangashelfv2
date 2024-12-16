@@ -2,7 +2,7 @@ import { useParams } from "@solidjs/router";
 import { Transition } from "solid-transition-group";
 import LibraryHeader from "./header";
 import { createEffect, createResource, createSignal, Show } from "solid-js";
-import NavBar from "../../main-components/navbar";
+import NavBar from "../../main-components/navbar/navbar";
 import get_user_by_id from "../../tauri-cmds/get_user_by_id";
 import get_os_folder_by_path from "../../tauri-cmds/mpv/get_os_folder_by_path";
 import { Tabs, TabsContent, TabsIndicator, TabsList, TabsTrigger } from "../../components/ui/tabs";
@@ -59,58 +59,79 @@ export default function Library() {
   // 1. Handle hydration logic separately
   createEffect(async () => {
     if (!hasFullyHydrated() && folderPath() && mainParentFolder() && user() && childFolders.state === "ready" && childFolders()) {
-      console.log("sending these childf olders into upsert: ", childFolders());
-      const is_refetch = await upsert_read_os_dir(mainParentFolder()?.path!, mainParentFolder()?.parent_path, user()!, childFolders()!, undefined);
+      //console.log("sending these childf olders into upsert: ", childFolders());
+      const is_refetch = 
+				await upsert_read_os_dir(mainParentFolder()?.path!, mainParentFolder()?.parent_path, user()!, childFolders()!, undefined);
 
       if (is_refetch) {
-        console.log("stale values detected, refreshing...");
+        console.warn("stale values detected; refetching.");
         setHasFullyHydrated(true);
-        await refetchChildFolders(); // Refetch if values are stale
+        await refetchChildFolders(); 
       }
     }
   });
 
   return (
-    <main class="w-full h-[100vh] relative overflow-auto" style={{ "scrollbar-gutter": "stable" }}>
-      <NavBar showHiddenFolders={showHiddenChildFolders} setShowHiddenFolders={setShowHiddenChildFolders} />
+    <main 
+			class="w-full h-[100vh] relative overflow-auto z-50" 
+			style={{ "scrollbar-gutter": "stable" }}>
+      <NavBar 
+				showHiddenFolders={showHiddenChildFolders} 
+				setShowHiddenFolders={setShowHiddenChildFolders} 
+			/>
       <Transition
         appear={true}
         onEnter={(el, done) => {
-          const a = el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200 });
+          const a = el.animate(
+						[{ opacity: 0 }, { opacity: 1 }], { duration: 200 });
           a.finished.then(done);
         }}
         onExit={(el, done) => {
-          const a = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 600 });
+          const a = el.animate(
+						[{ opacity: 1 }, { opacity: 0 }], { duration: 600 });
           a.finished.then(done);
         }}
       >
         <Tabs class="w-full" orientation="horizontal">
-          <Show when={mainParentFolder.state === "ready" && user.state === "ready"}>
+          <Show 
+						when={mainParentFolder.state === "ready" && user.state === "ready"}>
             <Transition
               appear={true}
               onEnter={(el, done) => {
-                const a = el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200 });
+                const a = el.animate(
+									[{ opacity: 0 }, { opacity: 1 }], { duration: 200 });
                 a.finished.then(done);
               }}
               onExit={(el, done) => {
-                const a = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 600 });
+                const a = el.animate(
+									[{ opacity: 1 }, { opacity: 0 }], { duration: 600 });
                 a.finished.then(done);
               }}
             >
-              <LibraryHeader mainParentFolder={mainParentFolder} user={user} lastReadMangaFolder={lastReadMangaFolder} />
+              <LibraryHeader 
+								mainParentFolder={mainParentFolder}
+								user={user} 
+								lastReadMangaFolder={lastReadMangaFolder} />
             </Transition>
             <TabsList class="w-full h-9 border">
               <Show when={childFolders()}>
                 <Show when={hasMangaFolders()}>
-                  <TabsTrigger value="chapters" class="w-fit lg:text-base folders flex flex-row gap-x-0.5">
+                  <TabsTrigger value="chapters" 
+										class="w-fit lg:text-base folders flex flex-row gap-x-0.5">
                     Chapters
-                    <IconFolderFilled class="ml-0.5 w-3 stroke-[2.4px]" />
+                    <IconFolderFilled 
+											class="ml-0.5 w-3 stroke-[2.4px]" 
+										/>
                   </TabsTrigger>
                 </Show>
                 <Show when={hasParentFolders()}>
-                  <TabsTrigger value="volumes" class="w-fit lg:text-base folders flex flex-row gap-x-0.5">
+                  <TabsTrigger 
+										value="volumes" 
+										class="w-fit lg:text-base folders flex flex-row gap-x-0.5">
                     Volumes
-                    <IconFolderFilled class="ml-0.5 w-3 stroke-[2.4px]" />
+                    <IconFolderFilled 
+											class="ml-0.5 w-3 stroke-[2.4px]" 
+										/>
                   </TabsTrigger>
                 </Show>
               </Show>

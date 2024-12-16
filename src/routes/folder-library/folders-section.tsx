@@ -28,12 +28,15 @@ export default function LibraryFoldersSection({
   return (
     <>
       <section
-        class="md:px-4 overflow-hidden w-full h-fit px-2 pb-4 relative
-				border-b-white border-b-2 shadow-lg shadow-primary/10 will-change-auto"
+        class="md:px-4 overflow-hidden 
+				w-full h-fit px-2 pb-4 relative will-change-auto
+				border-b-popover dark:border-b-muted border-b-2
+				shadow-lg shadow-primary/10 dark:shadow-primary-foreground/10"
       >
         <ul
-          class="mx-auto h-fit w-[89%] grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3
-					xl:grid-cols-4 gap-3 lg:px-12 place-items-center"
+          class="w-[86%] mx-auto h-fit md:w-[x-80%] xl:w-[73%] 
+					grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3
+					xl:grid-cols-4 gap-4 lg:px-12 place-items-center"
         >
           <For each={childFolders()}>
             {(folder, index) => (

@@ -1,8 +1,9 @@
 /* @refresh reload */
 import "./App.css";
-import { lazy } from "solid-js";
-import { Router } from "@solidjs/router";
+import { lazy, Suspense } from "solid-js";
+import { Router, RouteSectionProps } from "@solidjs/router";
 import { render } from "solid-js/web";
+import { ColorModeProvider, ColorModeScript } from "@kobalte/core";
 
 const routes = [
   {
@@ -31,4 +32,16 @@ const routes = [
   },
 ];
 
-render(() => <Router>{routes}</Router>, document.getElementById("root") as HTMLElement);
+render(() => (
+  <Router
+    root={(props: RouteSectionProps<unknown>) => (
+      <>
+        <ColorModeScript />
+        <ColorModeProvider>{props.children}</ColorModeProvider>
+      </>
+    )}
+  >
+    {routes}
+  </Router>
+), document.getElementById("root") as HTMLElement);
+

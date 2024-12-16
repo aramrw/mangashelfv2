@@ -94,34 +94,35 @@ export default function MangaReader() {
       if (parentFolder.state === "ready" && parentFolder()) {
         let newParentFolder = structuredClone(parentFolder()!);
         newParentFolder.last_read_panel = panels()![panelIndex()];
+        foldersToUpdate.push(newParentFolder);
+        // this if block is for the outermost parent folder i forgot why
         // this should be moved to rust because it calls rust functions anyway
-        if (newParentFolder.parent_path) {
-          const SUPER_PARENT = await getOutermostParentFolder(newParentFolder);
-          if (SUPER_PARENT.path !== newParentFolder.path) {
-            SUPER_PARENT.last_read_panel = panels()![panelIndex()];
-            foldersToUpdate.push(newParentFolder);
-          }
-        }
+
+        // if (newParentFolder.parent_path) {
+        //   const SUPER_PARENT = await getOutermostParentFolder(newParentFolder);
+        //   if (SUPER_PARENT.path !== newParentFolder.path) {
+        //     SUPER_PARENT.last_read_panel = panels()![panelIndex()];
+        //   }
+        // }
       }
       setCurrentMangaFolder(newFolder);
       await update_os_folders(foldersToUpdate, user()!);
-      console.log("updated folders:", foldersToUpdate);
     }
   };
 
   async function getOutermostParentFolder(folder: OsFolder) {
-    // Base case: if the folder has no parent, it's the outermost
+    // base case: if the folder has no parent, it's the outermost
     if (!folder.parent_path) {
       return folder;
     }
 
-    // Otherwise, recursively fetch the parent folder
+    // otherwise, recursively fetch the parent folder
     const parent = await get_os_folder_by_path(folder.parent_path);
     return getOutermostParentFolder(parent);
   };
 
   async function handleSetDoublePanels() {
-    // Check if you are NOT on the last panel
+    // check if you are NOT on the last panel
     if (currentMangaFolder() && user() && panels() && panelIndex() < panels()?.length! - 1) {
       setIsDoublePanels((prev) => !prev);
       let newFolder = structuredClone(currentMangaFolder());
@@ -225,15 +226,26 @@ export default function MangaReader() {
         handleNextSinglePanel={handleNextSinglePanel}
         handleNextPanel={handleNextPanel}
       />
-      <ErrorBoundary fallback={(err, reset) => <ErrorAlert error={err.toString()} onClick={reset} />}>
+      <ErrorBoundary
+        fallback={(err, reset) =>
+          <ErrorAlert error={err.toString()} onClick={reset} />
+        }>
         <Transition
           appear={true}
           onEnter={(el, done) => {
-            const a = el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 700 });
+            const a =
+              el.animate(
+                [{ opacity: 0 },
+                { opacity: 1 }],
+                { duration: 700 });
             a.finished.then(done);
           }}
           onExit={(el, done) => {
-            const a = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 600 });
+            const a =
+              el.animate(
+                [{ opacity: 1 },
+                { opacity: 0 }],
+                { duration: 600 });
             a.finished.then(done);
           }}
         >
@@ -253,7 +265,11 @@ export default function MangaReader() {
                 />
                 <div class={cn("relative flex justify-center items-center ", isDoublePanels() && "flex-row-reverse")}>
                   <div
-                    class="w-full h-fit pb-20 text-lg flex justify-center z-50 opacity-0 group hover:opacity-100 transition-opacity duration-300 absolute"
+                    class="w-full 
+										h-fit pb-20 text-lg flex 
+										justify-center z-50 opacity-0 group 
+										hover:opacity-100 transition-opacity 
+										duration-300 absolute"
                     style={{
                       top: "0",
                       left: "50%",
@@ -261,9 +277,12 @@ export default function MangaReader() {
                     }}
                   >
                     <h1
-                      class="p-1 leading-none truncated w-fit text-center text-nowrap text-secondary bg-primary
-										group-hover:shadow-md group-hover:mix-blend-luminosity
-										select-none px-3 h-fit pb-1.5 rounded-b-sm
+                      class="p-1 leading-none truncated 
+											w-fit text-center text-nowrap 
+											text-secondary dark:text-secondary-foreground
+											bg-primary dark:bg-primary-foreground
+											group-hover:shadow-md group-hover:mix-blend-luminosity
+											select-none px-3 h-fit pb-1.5 rounded-b-sm
 											font-semibold will-change-auto z-50"
                     >
                       {currentMangaFolder()?.title}
@@ -273,13 +292,19 @@ export default function MangaReader() {
                   <For each={panels()}>
                     {(panel, i) => {
                       return (
-                        <Show when={i() >= panelIndex() - 10 && i() <= panelIndex() + 10}>
-                          < RenderPanel panel={panel} isDoublePanels={isDoublePanels} panelIndex={panelIndex} i={i} />
+                        <Show
+                          when={i() >= panelIndex() - 10 && i() <= panelIndex() + 10}>
+                          <RenderPanel
+                            panel={panel}
+                            isDoublePanels={isDoublePanels}
+                            panelIndex={panelIndex} i={i}
+                          />
                         </Show>
                       );
                     }}
                   </For>
 
+                  {/* panel(s) info on hover */}
                   <div
                     class={cn(
                       "w-full h-fit pt-20 flex justify-between items-end text-lg z-50 opacity-0 group hover:opacity-100 transition-opacity duration-300 absolute",
@@ -292,17 +317,27 @@ export default function MangaReader() {
                     }}
                   >
                     <Show when={isDoublePanels()}>
-                      <p class="bg-primary text-sm select-none text-muted font-medium py-1 px-2">{CURRENT_PANELS().second?.title}</p>
+                      <p class="bg-primary dark:bg-primary-foreground 
+											text-sm select-none 
+											text-muted dark:text-secondary-foreground 
+											font-medium py-1 px-2">
+                        {CURRENT_PANELS().second?.title}
+                      </p>
                     </Show>
                     <h1
                       class={cn(
-                        "w-fit flex flex-col text-center text-nowrap text-secondary bg-primary group-hover:shadow-md group-hover:mix-blend-luminosity select-none px-3 h-fit pb-0.5 rounded-t-sm font-semibold will-change-auto z-50",
+                        "w-fit flex flex-col text-center text-nowrap text-secondary dark:text-secondary-foreground bg-primary dark:bg-primary-foreground group-hover:shadow-md group-hover:mix-blend-luminosity select-none px-3 h-fit pb-0.5 rounded-t-sm font-semibold will-change-auto z-50",
                         !isDoublePanels() && "rounded-none",
                       )}
                     >
                       {panelIndex() + 1}/{panels()?.length!}
                     </h1>
-                    <p class="bg-primary text-sm select-none text-muted font-medium py-1 px-2">{CURRENT_PANELS().first?.title}</p>
+                    <p class="bg-primary dark:bg-primary-foreground 
+											text-sm select-none 
+											text-muted dark:text-secondary-foreground 
+											font-medium py-1 px-2">
+                      {CURRENT_PANELS().first?.title}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -341,7 +376,7 @@ const NavigationButtons = ({
     {/* Left Button */}
     <div
       class={cn(
-        "h-full w-1/4 z-20 absolute left-0 flex items-center cursor-pointer justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30 will-change-auto",
+        "z-[60] h-full w-1/4 absolute left-0 flex items-center cursor-pointer justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30 will-change-auto",
       )}
       onClick={async () => {
         if (isLastPanel()) {
@@ -355,15 +390,20 @@ const NavigationButtons = ({
         }
       }}
     >
-      <Show when={isLastPanel()} fallback={<IconChevronLeft class="h-20 md:h-32 lg:h-40 xl:h-56 w-auto bg-primary/10 pl-1 text-primary/50 rounded-md" />}>
-        <IconChevronsLeft class="h-20 md:h-32 lg:h-40 xl:h-56 w-auto bg-primary/15 pl-1 text-primary/50 rounded-md" />
+      <Show when={isLastPanel()}
+        fallback={<IconChevronLeft
+          class="h-20 md:h-32 lg:h-40 xl:h-56 w-auto 
+						bg-primary/10 pl-1 text-primary/50 rounded-md" />}>
+        <IconChevronsLeft
+          class="h-20 md:h-32 lg:h-40 xl:h-56 w-auto 
+						bg-primary/15 pl-1 text-primary/50 rounded-md" />
       </Show>
     </div>
 
     {/* Right Button */}
     <div
       class={cn(
-        "h-full w-1/4 z-20 absolute right-0 flex items-center cursor-pointer justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30 will-change-auto",
+        "h-full w-1/4 z-[60] absolute right-0 flex items-center cursor-pointer justify-center hover:bg-primary/15 transition-all opacity-0 hover:opacity-30 will-change-auto",
         isFirstPanel() && "hover:opacity-70",
       )}
       onClick={async () => {

@@ -27,7 +27,7 @@ import { IconAdjustments, IconUserFilled } from "@tabler/icons-solidjs";
 import IconMpv from "../../main-components/icons/icon-mpv";
 import ProfileTabSection from "./tab-sections/profile";
 import SettingsErrorCard from "./tab-sections/error-card";
-import NavBar from "../../main-components/navbar";
+import NavBar from "../../main-components/navbar/navbar";
 import { Transition } from "solid-transition-group";
 
 const handleSettingParams = (params: Params): string[] | string => {
