@@ -73,7 +73,7 @@ export default function Dashboard() {
             <div class="w-full h-7 bg-popover shadow-sm my-1.5 outline outline-1 outline-muted"/>
             <section
               id="manga_folders_section"
-              class={SECTION_CLASS}
+              class={SECTION_CLASS + "pb-2"}
             >
               <For each={osFolders()}>
                 {(folder) => (

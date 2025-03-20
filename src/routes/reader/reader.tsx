@@ -1,11 +1,25 @@
 import { useParams } from "@solidjs/router";
-import { Accessor, createEffect, createResource, createSignal, ErrorBoundary, For, JSX, Show } from "solid-js";
+import {
+  Accessor,
+  createEffect,
+  createResource,
+  createSignal,
+  ErrorBoundary,
+  For,
+  JSX,
+  Show,
+} from "solid-js";
 import get_os_folder_by_path from "../../tauri-cmds/mpv/get_os_folder_by_path";
 import ReaderNavbar from "./reader-nav";
 import get_user_by_id from "../../tauri-cmds/get_user_by_id";
 import { get_panels } from "../../tauri-cmds/get_panels";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import { IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight } from "@tabler/icons-solidjs";
+import {
+  IconChevronLeft,
+  IconChevronRight,
+  IconChevronsLeft,
+  IconChevronsRight,
+} from "@tabler/icons-solidjs";
 import update_os_folders from "../../tauri-cmds/os_folders/update_os_folders";
 import { MangaPanel, OsFolder } from "../../models";
 import { Transition } from "solid-transition-group";
@@ -18,12 +32,24 @@ import img_err from "../../main-components/img/img_err.jpeg";
 export default function MangaReader() {
   const params = useParams();
   const currentPlatform = platform();
-  const [folderPath, setFolderPath] = createSignal(decodeURIComponent(params.folder));
-  const [currentMangaFolder, { mutate: setCurrentMangaFolder }] = createResource(folderPath, get_os_folder_by_path);
-  const [parentFolder] = createResource(() => (currentMangaFolder() ? currentMangaFolder()?.parent_path : null), get_os_folder_by_path);
-  const [user] = createResource(() => (currentMangaFolder() ? currentMangaFolder()?.user_id : null), get_user_by_id);
+  const [folderPath, setFolderPath] = createSignal(
+    decodeURIComponent(params.folder),
+  );
+  const [currentMangaFolder, { mutate: setCurrentMangaFolder }] =
+    createResource(folderPath, get_os_folder_by_path);
+  const [parentFolder] = createResource(
+    () => (currentMangaFolder() ? currentMangaFolder()?.parent_path : null),
+    get_os_folder_by_path,
+  );
+  const [user] = createResource(
+    () => (currentMangaFolder() ? currentMangaFolder()?.user_id : null),
+    get_user_by_id,
+  );
 
-  const [panels, { refetch: refetchPanels }] = createResource(() => (currentMangaFolder() ? currentMangaFolder()?.path : null), get_panels);
+  const [panels, { refetch: refetchPanels }] = createResource(
+    () => (currentMangaFolder() ? currentMangaFolder()?.path : null),
+    get_panels,
+  );
   const [panelIndex, setPanelIndex] = createSignal<number>(0);
   const [isDoublePanels, setIsDoublePanels] = createSignal(false);
   const [isfullyHydrated, setIsFullyHydrated] = createSignal(false);
@@ -31,15 +57,20 @@ export default function MangaReader() {
 
   // hydrates stale folders
   createEffect(async () => {
-    if (!isfullyHydrated() && folderPath() && currentMangaFolder() && user() && panels()) {
-      const is_refetch = await
-        upsert_read_os_dir(
-          currentMangaFolder()?.path!,
-          currentMangaFolder()?.parent_path,
-          user()!,
-          undefined,
-          panels()!
-        );
+    if (
+      !isfullyHydrated() &&
+      folderPath() &&
+      currentMangaFolder() &&
+      user() &&
+      panels()
+    ) {
+      const is_refetch = await upsert_read_os_dir(
+        currentMangaFolder()?.path!,
+        currentMangaFolder()?.parent_path,
+        user()!,
+        undefined,
+        panels()!,
+      );
       if (is_refetch) {
         await refetchPanels();
       }
@@ -49,7 +80,12 @@ export default function MangaReader() {
 
   // makes sure everything is ready on startup
   createEffect(() => {
-    if (currentMangaFolder.state === "ready" && panels.state === "ready" && !hasInitialized() && isfullyHydrated()) {
+    if (
+      currentMangaFolder.state === "ready" &&
+      panels.state === "ready" &&
+      !hasInitialized() &&
+      isfullyHydrated()
+    ) {
       // set zoom and double panels from the current folder
       setIsDoublePanels(currentMangaFolder()?.is_double_panels!);
 
@@ -75,10 +111,11 @@ export default function MangaReader() {
   });
 
   const handleUpdateFolders = async () => {
-    if (currentMangaFolder.state === "ready"
-      && panelIndex() !== undefined
-      && panels.state === "ready"
-      && user.state === "ready"
+    if (
+      currentMangaFolder.state === "ready" &&
+      panelIndex() !== undefined &&
+      panels.state === "ready" &&
+      user.state === "ready"
     ) {
       let newFolder = structuredClone(currentMangaFolder()!);
       newFolder.last_read_panel = panels()![panelIndex()];
@@ -119,18 +156,22 @@ export default function MangaReader() {
     // otherwise, recursively fetch the parent folder
     const parent = await get_os_folder_by_path(folder.parent_path);
     return getOutermostParentFolder(parent);
-  };
+  }
 
   async function handleSetDoublePanels() {
     // check if you are NOT on the last panel
-    if (currentMangaFolder() && user() && panels() && panelIndex() < panels()?.length! - 1) {
+    if (
+      currentMangaFolder() &&
+      user() &&
+      panels() &&
+      panelIndex() < panels()?.length! - 1
+    ) {
       setIsDoublePanels((prev) => !prev);
       let newFolder = structuredClone(currentMangaFolder());
       if (newFolder) {
         newFolder.is_double_panels = isDoublePanels();
-        await update_os_folders([newFolder], user()!).then(() => {
-          setCurrentMangaFolder(newFolder);
-        });
+        await update_os_folders([newFolder], user()!);
+        setCurrentMangaFolder(newFolder);
       }
     }
   }
@@ -139,7 +180,10 @@ export default function MangaReader() {
     if (panelIndex() === 0) {
       let prev: OsFolder | null = null;
       try {
-        prev = await invoke("get_prev_folder", { parentPath: parentFolder()?.path, currentFolder: currentMangaFolder() });
+        prev = await invoke("get_prev_folder", {
+          parentPath: parentFolder()?.path,
+          currentFolder: currentMangaFolder(),
+        });
       } catch {
         // prolly nothing important
       }
@@ -163,7 +207,10 @@ export default function MangaReader() {
     if (panelIndex() === panelLen) {
       let next: OsFolder | null = null;
       try {
-        next = await invoke("get_next_folder", { parentPath: parentFolder()?.path, currentFolder: currentMangaFolder() });
+        next = await invoke("get_next_folder", {
+          parentPath: parentFolder()?.path,
+          currentFolder: currentMangaFolder(),
+        });
       } catch {
         // prolly nothin important
       }
@@ -208,7 +255,12 @@ export default function MangaReader() {
   };
 
   return (
-    <main class={cn("overflow-hidden flex flex-col justify-start relative h-[100dvh] pb-2 will-change-auto", currentPlatform === "macos" && "h-full")}>
+    <main
+      class={cn(
+        "overflow-hidden flex flex-col justify-start relative h-[100dvh] pb-2 will-change-auto",
+        currentPlatform === "macos" && "h-full",
+      )}
+    >
       <ReaderNavbar
         user={user}
         folder={currentMangaFolder}
@@ -227,25 +279,22 @@ export default function MangaReader() {
         handleNextPanel={handleNextPanel}
       />
       <ErrorBoundary
-        fallback={(err, reset) =>
+        fallback={(err, reset) => (
           <ErrorAlert error={err.toString()} onClick={reset} />
-        }>
+        )}
+      >
         <Transition
           appear={true}
           onEnter={(el, done) => {
-            const a =
-              el.animate(
-                [{ opacity: 0 },
-                { opacity: 1 }],
-                { duration: 700 });
+            const a = el.animate([{ opacity: 0 }, { opacity: 1 }], {
+              duration: 700,
+            });
             a.finished.then(done);
           }}
           onExit={(el, done) => {
-            const a =
-              el.animate(
-                [{ opacity: 1 },
-                { opacity: 0 }],
-                { duration: 600 });
+            const a = el.animate([{ opacity: 1 }, { opacity: 0 }], {
+              duration: 600,
+            });
             a.finished.then(done);
           }}
         >
@@ -263,12 +312,17 @@ export default function MangaReader() {
                   handleSetLastPanel={handleSetLastPanel}
                   handleSetFirstPanel={handleSetFirstPanel}
                 />
-                <div class={cn("relative flex justify-center items-center ", isDoublePanels() && "flex-row-reverse")}>
+                <div
+                  class={cn(
+                    "relative flex justify-center items-center ",
+                    isDoublePanels() && "flex-row-reverse",
+                  )}
+                >
                   <div
-                    class="w-full 
-										h-fit pb-20 text-lg flex 
-										justify-center z-50 opacity-0 group 
-										hover:opacity-100 transition-opacity 
+                    class="w-full
+										h-fit pb-20 text-lg flex
+										justify-center z-50 opacity-0 group
+										hover:opacity-100 transition-opacity
 										duration-300 absolute"
                     style={{
                       top: "0",
@@ -277,8 +331,8 @@ export default function MangaReader() {
                     }}
                   >
                     <h1
-                      class="p-1 leading-none truncated 
-											w-fit text-center text-nowrap 
+                      class="p-1 leading-none truncated
+											w-fit text-center text-nowrap
 											text-secondary dark:text-secondary-foreground
 											bg-primary dark:bg-primary-foreground
 											group-hover:shadow-md group-hover:mix-blend-luminosity
@@ -293,11 +347,15 @@ export default function MangaReader() {
                     {(panel, i) => {
                       return (
                         <Show
-                          when={i() >= panelIndex() - 10 && i() <= panelIndex() + 10}>
+                          when={
+                            i() >= panelIndex() - 2 && i() <= panelIndex() + 2
+                          }
+                        >
                           <RenderPanel
                             panel={panel}
                             isDoublePanels={isDoublePanels}
-                            panelIndex={panelIndex} i={i}
+                            panelIndex={panelIndex}
+                            i={i}
                           />
                         </Show>
                       );
@@ -317,11 +375,18 @@ export default function MangaReader() {
                     }}
                   >
                     <Show when={isDoublePanels()}>
-                      <p class="bg-primary dark:bg-primary-foreground 
-											text-sm select-none 
-											text-muted dark:text-secondary-foreground 
-											font-medium py-1 px-2">
-                        {CURRENT_PANELS().second?.title}
+                      <p
+                        class="bg-primary dark:bg-primary-foreground
+											text-sm select-none
+											text-muted dark:text-secondary-foreground
+											font-medium py-1 px-2"
+                      >
+                        <Show
+                          when={panelIndex() + 1 != panels()?.length}
+                          fallback={CURRENT_PANELS().first?.title}
+                        >
+                          {CURRENT_PANELS().second?.title}
+                        </Show>
                       </p>
                     </Show>
                     <h1
@@ -332,11 +397,18 @@ export default function MangaReader() {
                     >
                       {panelIndex() + 1}/{panels()?.length!}
                     </h1>
-                    <p class="bg-primary dark:bg-primary-foreground 
-											text-sm select-none 
-											text-muted dark:text-secondary-foreground 
-											font-medium py-1 px-2">
-                      {CURRENT_PANELS().first?.title}
+                    <p
+                      class="bg-primary dark:bg-primary-foreground
+											text-sm select-none
+											text-muted dark:text-secondary-foreground
+											font-medium py-1 px-2"
+                    >
+                      <Show
+                        when={panelIndex() + 1 != panels()?.length}
+                        fallback={panels()?.[panelIndex() - 1].title}
+                      >
+                        {CURRENT_PANELS().first?.title}
+                      </Show>
                     </p>
                   </div>
                 </div>
@@ -390,13 +462,19 @@ const NavigationButtons = ({
         }
       }}
     >
-      <Show when={isLastPanel()}
-        fallback={<IconChevronLeft
-          class="h-20 md:h-32 lg:h-40 xl:h-56 w-auto 
-						bg-primary/10 pl-1 text-primary/50 rounded-md" />}>
+      <Show
+        when={isLastPanel()}
+        fallback={
+          <IconChevronLeft
+            class="h-20 md:h-32 lg:h-40 xl:h-56 w-auto
+						bg-primary/10 pl-1 text-primary/50 rounded-md"
+          />
+        }
+      >
         <IconChevronsLeft
-          class="h-20 md:h-32 lg:h-40 xl:h-56 w-auto 
-						bg-primary/15 pl-1 text-primary/50 rounded-md" />
+          class="h-20 md:h-32 lg:h-40 xl:h-56 w-auto
+						bg-primary/15 pl-1 text-primary/50 rounded-md"
+        />
       </Show>
     </div>
 
@@ -419,7 +497,12 @@ const NavigationButtons = ({
         }
       }}
     >
-      <Show when={isFirstPanel()} fallback={<IconChevronRight class="h-20 md:h-32 lg:h-40 xl:h-56 w-auto bg-primary/10 pl-1 text-primary/50 rounded-md" />}>
+      <Show
+        when={isFirstPanel()}
+        fallback={
+          <IconChevronRight class="h-20 md:h-32 lg:h-40 xl:h-56 w-auto bg-primary/10 pl-1 text-primary/50 rounded-md" />
+        }
+      >
         <IconChevronsRight class="h-20 md:h-32 lg:h-40 xl:h-56 w-auto bg-primary/10 pl-1 text-primary/50 rounded-md" />
       </Show>
     </div>
@@ -439,32 +522,88 @@ function RenderPanel({
 }) {
   const isCurrent = () => panelIndex() === i();
   const isNext = () => isDoublePanels() && panelIndex() === i() + 1;
+  const [isHovering, setIsHovering] = createSignal(false);
+  const [mousePos, setMousePos] = createSignal({ x: 0, y: 0 });
+  const [imgSize, setImgSize] = createSignal({ width: 0, height: 0 });
 
-  // Styles for positioning
-  let style = {
+  // Magnifier configuration
+  const magnifierSize = 250;
+  const zoomLevel = 10;
+
+  const handleMouseMove = (e: MouseEvent) => {
+    const img = e.currentTarget as HTMLImageElement;
+    const { left, top, naturalWidth, naturalHeight } = img;
+    const { width, height } = img.getBoundingClientRect();
+    
+    // Get actual image dimensions (not just displayed size)
+    const imgAspect = naturalWidth / naturalHeight;
+    const displayWidth = Math.min(width, height * imgAspect);
+    const displayHeight = displayWidth / imgAspect;
+
+    const x = ((e.clientX - left) / width) * 100;
+    const y = ((e.clientY - top) / height) * 100;
+    
+    setMousePos({ x, y });
+    setImgSize({ width: displayWidth, height: displayHeight });
+  };
+
+  // Original positioning logic
+  const style = {
     position: "absolute",
     top: "50%",
-    left: "50%", // Center horizontally
-    transform: "translate(-50%, -50%)", // Adjust for exact centering
+    left: "50%",
+    transform: "translate(-50%, -50%)",
   } satisfies JSX.CSSProperties;
 
   return (
-    <img
-      src={convertFileSrc(panel.path)}
-      alt={panel.title || "Panel"}
-      decoding="async"
-      class={cn(
-        "select-none bg-black will-change-auto object-contain max-h-[calc(100vh-37px)]",
-        isCurrent() || isNext() ? "opacity-100 z-20" : "opacity-[0.002]",
-        isDoublePanels() ? "max-w-[calc((100vw-10px)/2)]" : "max-w-[calc((100vw-10px))]",
-      )}
-      style={isCurrent() || isNext() ? { position: "relative" } : style}
-      onError={(e) => {
-        console.error(`Image failed to load: ${convertFileSrc(panel.path)}`);
-        e.preventDefault();
-        e.currentTarget.onerror = null; // Prevent infinite loop
-        e.currentTarget.src = img_err; // Replace with fallback image
-      }}
-    />
+    <div class="relative">
+      <img
+        src={convertFileSrc(panel.path)}
+        alt={panel.title || "Panel"}
+        decoding="async"
+        loading="eager"
+        class={cn(
+          "select-none bg-black will-change-auto object-contain max-h-[calc(100vh-37px)]",
+          isCurrent() || isNext() ? "opacity-100 z-20" : "opacity-[0.002]",
+          isDoublePanels()
+            ? "max-w-[calc((100vw-10px)/2)]"
+            : "max-w-[calc((100vw-10px))]",
+        )}
+        style={isCurrent() || isNext() ? { position: "relative" } : style}
+        onMouseEnter={() => setIsHovering(true)}
+        onMouseLeave={() => setIsHovering(false)}
+        onMouseMove={handleMouseMove}
+        onError={(e) => {
+          console.error(`Image failed to load: ${convertFileSrc(panel.path)}`);
+          e.preventDefault();
+          const target = e.currentTarget as HTMLImageElement | null;
+          if (target) {
+            target.onerror = null;
+            target.src = img_err;
+          }
+        }}
+      />
+
+      {/* Magnifier overlay */}
+      <Show when={isHovering()}>
+        <div
+          class="pointer-events-none absolute border-2 border-white rounded-full overflow-hidden bg-no-repeat"
+          style={{
+            width: `${magnifierSize}px`,
+            height: `${magnifierSize}px`,
+            left: `${mousePos().x}%`,
+            top: `${mousePos().y}%`,
+            transform: "translate(-50%, -50%)",
+            "background-image": `url(${convertFileSrc(panel.path)})`,
+            "background-position": `
+              ${((mousePos().x / 100) * imgSize().width - magnifierSize / (2 * zoomLevel)) * zoomLevel}px 
+              ${((mousePos().y / 100) * imgSize().height - magnifierSize / (2 * zoomLevel)) * zoomLevel}px
+            `,
+            "background-size": `${imgSize().width * zoomLevel}px ${imgSize().height * zoomLevel}px`,
+            "z-index": 9999,
+          }}
+        />
+      </Show>
+    </div>
   );
 }

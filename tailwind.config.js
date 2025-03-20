@@ -1,4 +1,4 @@
-const { fontFamily } = require("tailwindcss/defaultTheme");
+const { fontFamily } = import("tailwindcss/defaultTheme.js");
 
 /** @type {import('tailwindcss').Config} */
 export default {
@@ -55,9 +55,9 @@ export default {
         md: `calc(var(--radius) - 2px)`,
         sm: "calc(var(--radius) - 4px)"
       },
-      fontFamily: {
-        sans: ["Inter Variable", ...fontFamily.sans]
-      },
+      // fontFamily: {
+      //   sans: ["Inter Variable", ...fontFamily.sans]
+      // },
       keyframes: {
         "accordion-down": {
           from: { height: 0 },
@@ -84,5 +84,5 @@ export default {
       }
     }
   },
-  plugins: [require("tailwindcss-animate")]
+  plugins: [import("tailwindcss-animate")]
 };

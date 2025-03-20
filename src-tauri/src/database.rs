@@ -70,18 +70,39 @@ where
     Ok(seconds.map(|sec| SystemTime::UNIX_EPOCH + Duration::new(sec, 0)))
 }
 
+fn try_dir_size(path: impl AsRef<Path>) -> Result<usize, io::Error> {
+    let mut count = 0;
+    let path = path.as_ref();
+    for item in read_dir(path)? {
+        let item = item?;
+        let item_path = item.path();
+        if item_path.is_dir() {
+            count += try_dir_size(item_path)?;
+        } else if item_path.is_file() {
+            count += 1;
+        }
+    }
+
+    Ok(count)
+}
+
 impl FileMetadata {
     // Constructor to get metadata of a file
-    pub fn from_path(path: impl AsRef<Path>) -> Option<Self> {
+    pub fn from_path(path: impl AsRef<Path>) -> Result<Self, io::Error> {
+        let path = path.as_ref();
         let metadata = std::fs::metadata(path).ok();
 
         if let Some(metadata) = metadata {
             let modified = metadata.modified().ok();
             let created = metadata.created().ok();
             let accessed = metadata.accessed().ok();
-            let size = Some(metadata.len());
+            let mut size = Some(metadata.len());
 
-            return Some(Self {
+            if path.is_dir() {
+                size = Some(try_dir_size(path)? as u64);
+            }
+
+            return Ok(Self {
                 modified,
                 created,
                 accessed,
@@ -89,7 +110,7 @@ impl FileMetadata {
             });
         }
 
-        None
+        unreachable!();
     }
 }
 
@@ -287,7 +308,7 @@ impl MangaPanel {
             .to_string_lossy()
             .to_string();
 
-        let metadata = FileMetadata::from_path(&path);
+        let metadata: Option<FileMetadata> = FileMetadata::from_path(&path).ok();
 
         // Create MangaPanel instance
         let vid = MangaPanel {
@@ -307,7 +328,7 @@ impl MangaPanel {
     pub fn is_stale_metadata(&self) -> bool {
         if let Some(ref current_metadata) = self.metadata {
             // Fetch the current metadata of the file
-            match FileMetadata::from_path(&self.path) {
+            match FileMetadata::from_path(&self.path).ok() {
                 Some(new_metadata) => {
                     // Compare the modified time and size
                     //current_metadata.modified != new_metadata.modified ||
@@ -322,7 +343,7 @@ impl MangaPanel {
 
     // Update the manga panel's metadata
     pub fn _update_metadata(&mut self) {
-        if let Some(new_metadata) = FileMetadata::from_path(&self.path) {
+        if let Ok(new_metadata) = FileMetadata::from_path(&self.path) {
             self.metadata = Some(new_metadata);
         }
     }

@@ -1,10 +1,7 @@
 use crate::database::data::v1::User;
-use fast_image_resize::images::Image;
-use fast_image_resize::{IntoImageView, Resizer};
-use futures_util::future::join_all;
 use hashbrown::{HashMap, HashSet};
 use image::codecs::jpeg::JpegEncoder;
-use image::{DynamicImage, ImageEncoder, ImageReader};
+use image::DynamicImage;
 use rayon::slice::ParallelSliceMut;
 use std::fs::File;
 use std::io::BufWriter;
