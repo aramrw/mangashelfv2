@@ -56,7 +56,7 @@ const AddNewSkeleton = ({
 							sm:h-44 sm:w-32 
 							md:h-48 md:w-36 
 							lg:h-64 lg:w-48
-							xl:h-80 xl:w-56 
+							xl:h-72 xl:w-56 
 							rounded-sm shadow-md 
 							bg-popover dark:bg-popover"
             />

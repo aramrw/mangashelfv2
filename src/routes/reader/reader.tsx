@@ -54,6 +54,7 @@ export default function MangaReader() {
   const [isDoublePanels, setIsDoublePanels] = createSignal(false);
   const [isfullyHydrated, setIsFullyHydrated] = createSignal(false);
   const [hasInitialized, setHasInitialized] = createSignal(false);
+  const [zoomLevel, setZoomLevel] = createSignal(1.0);
 
   // hydrates stale folders
   createEffect(async () => {
@@ -270,6 +271,8 @@ export default function MangaReader() {
         isDoublePanels={isDoublePanels}
         setPanelIndex={setPanelIndex}
         setCurrentMangaFolder={setCurrentMangaFolder}
+        zoomLevel={zoomLevel}
+        setZoomLevel={setZoomLevel}
         handleSetDoublePanels={handleSetDoublePanels}
         handleSetFirstPanel={handleSetFirstPanel}
         handleSetLastPanel={handleSetLastPanel}
@@ -356,6 +359,7 @@ export default function MangaReader() {
                             isDoublePanels={isDoublePanels}
                             panelIndex={panelIndex}
                             i={i}
+                            zoomLevel={zoomLevel}
                           />
                         </Show>
                       );
@@ -514,45 +518,27 @@ function RenderPanel({
   isDoublePanels,
   i,
   panelIndex,
+  zoomLevel,
 }: {
   panel: MangaPanel;
   isDoublePanels: Accessor<boolean>;
   i: Accessor<number>;
   panelIndex: Accessor<number>;
+  zoomLevel: Accessor<number>,
 }) {
   const isCurrent = () => panelIndex() === i();
   const isNext = () => isDoublePanels() && panelIndex() === i() + 1;
-  const [isHovering, setIsHovering] = createSignal(false);
-  const [mousePos, setMousePos] = createSignal({ x: 0, y: 0 });
-  const [imgSize, setImgSize] = createSignal({ width: 0, height: 0 });
 
-  // Magnifier configuration
-  const magnifierSize = 250;
-  const zoomLevel = 10;
-
-  const handleMouseMove = (e: MouseEvent) => {
-    const img = e.currentTarget as HTMLImageElement;
-    const { left, top, naturalWidth, naturalHeight } = img;
-    const { width, height } = img.getBoundingClientRect();
-    
-    // Get actual image dimensions (not just displayed size)
-    const imgAspect = naturalWidth / naturalHeight;
-    const displayWidth = Math.min(width, height * imgAspect);
-    const displayHeight = displayWidth / imgAspect;
-
-    const x = ((e.clientX - left) / width) * 100;
-    const y = ((e.clientY - top) / height) * 100;
-    
-    setMousePos({ x, y });
-    setImgSize({ width: displayWidth, height: displayHeight });
-  };
-
-  // Original positioning logic
-  const style = {
+  const defaultStyle = {
     position: "absolute",
     top: "50%",
     left: "50%",
-    transform: "translate(-50%, -50%)",
+    transform: `translate(-50%, -50%) scale(${zoomLevel()})`,
+  } satisfies JSX.CSSProperties;
+
+  const currentStyle = {
+    position: "relative",
+    transform: `scale(${zoomLevel()})`,
   } satisfies JSX.CSSProperties;
 
   return (
@@ -567,12 +553,16 @@ function RenderPanel({
           isCurrent() || isNext() ? "opacity-100 z-20" : "opacity-[0.002]",
           isDoublePanels()
             ? "max-w-[calc((100vw-10px)/2)]"
-            : "max-w-[calc((100vw-10px))]",
+            : "max-w-[calc((100vw-10px))]"
         )}
-        style={isCurrent() || isNext() ? { position: "relative" } : style}
-        onMouseEnter={() => setIsHovering(true)}
-        onMouseLeave={() => setIsHovering(false)}
-        onMouseMove={handleMouseMove}
+        style={{
+          position: isCurrent() || isNext() ? "relative" : "absolute",
+          top: isCurrent() || isNext() ? undefined : "50%",
+          left: isCurrent() || isNext() ? undefined : "50%",
+          transform: isCurrent() || isNext()
+            ? `scale(${zoomLevel()})`
+            : `translate(-50%, -50%) scale(${zoomLevel()})`
+        }}
         onError={(e) => {
           console.error(`Image failed to load: ${convertFileSrc(panel.path)}`);
           e.preventDefault();
@@ -584,26 +574,6 @@ function RenderPanel({
         }}
       />
 
-      {/* Magnifier overlay */}
-      <Show when={isHovering()}>
-        <div
-          class="pointer-events-none absolute border-2 border-white rounded-full overflow-hidden bg-no-repeat"
-          style={{
-            width: `${magnifierSize}px`,
-            height: `${magnifierSize}px`,
-            left: `${mousePos().x}%`,
-            top: `${mousePos().y}%`,
-            transform: "translate(-50%, -50%)",
-            "background-image": `url(${convertFileSrc(panel.path)})`,
-            "background-position": `
-              ${((mousePos().x / 100) * imgSize().width - magnifierSize / (2 * zoomLevel)) * zoomLevel}px 
-              ${((mousePos().y / 100) * imgSize().height - magnifierSize / (2 * zoomLevel)) * zoomLevel}px
-            `,
-            "background-size": `${imgSize().width * zoomLevel}px ${imgSize().height * zoomLevel}px`,
-            "z-index": 9999,
-          }}
-        />
-      </Show>
     </div>
   );
 }

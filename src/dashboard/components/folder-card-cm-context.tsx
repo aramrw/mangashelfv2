@@ -54,7 +54,7 @@ export default function FolderCardContextMenuContent({
           <Show when={user && user()}>
             <ContextMenuItem
               onClick={async () => {
-                if (user && user() && refetch) {
+                if (user && user()) {
                   const folderClone = structuredClone(folder);
                   folderClone.is_hidden = !folder.is_hidden;
                   await update_os_folders([folderClone], user()!);
@@ -75,7 +75,6 @@ export default function FolderCardContextMenuContent({
                 <IconHeroSlashEye class="h-auto w-4" />
               </Show>
             </ContextMenuItem>
-            <Show when={isLastReadMangaFolder !== true}>
               <ContextMenuItem
                 onClick={async () => {
                   if (user && user() && refetch) {
@@ -88,7 +87,6 @@ export default function FolderCardContextMenuContent({
                 <IconBackspace class="h-auto w-5" />
               </ContextMenuItem>
             </Show>
-          </Show>
         </ContextMenuSubContent>
       </ContextMenuSub >
     </ContextMenuContent >

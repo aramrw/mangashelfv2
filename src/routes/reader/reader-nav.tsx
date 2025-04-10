@@ -1,4 +1,4 @@
-import { IconAdjustments, IconArrowNarrowLeftDashed, IconChalkboard, IconColumns1, IconColumns2 } from "@tabler/icons-solidjs";
+import { IconAdjustments, IconArrowNarrowLeftDashed, IconChalkboard, IconColumns1, IconColumns2, IconZoomIn, IconZoomOut, IconZoomOutFilled } from "@tabler/icons-solidjs";
 import { A, useNavigate } from "@solidjs/router";
 import { Accessor, createSignal, onCleanup, onMount, Resource, Setter, Show } from "solid-js";
 import { MangaPanel, OsFolder, UserType } from "../../models";
@@ -14,6 +14,8 @@ export default function ReaderNavbar({
   isDoublePanels,
   setPanelIndex,
   setCurrentMangaFolder,
+  zoomLevel,
+  setZoomLevel,
   handleSetDoublePanels,
   handleSetFirstPanel,
   handleSetLastPanel,
@@ -30,6 +32,8 @@ export default function ReaderNavbar({
   isDoublePanels: Accessor<boolean>;
   setPanelIndex: Setter<number>,
   setCurrentMangaFolder: Setter<OsFolder | undefined>
+  zoomLevel: Accessor<number>,
+  setZoomLevel: Setter<number>,
   handleSetDoublePanels(): Promise<void>;
   handleSetFirstPanel: () => Promise<void>;
   handleSetLastPanel: () => Promise<void>;
@@ -164,16 +168,6 @@ export default function ReaderNavbar({
     >
       <ul class="h-full w-full flex flex-row items-center justify-between relative">
         <div class="w-fit flex flex-row h-full">
-          <NavbarListItem
-            onClick={() => {
-              navigate(-1);
-            }}
-          >
-            <IconArrowNarrowLeftDashed
-              class="text-secondary dark:text-secondary-foreground 
-							fill-accent stroke-[2]"
-            />
-          </NavbarListItem>
           <NavbarListItem>
             <A href="/dashboard">
               <IconChalkboard
@@ -198,6 +192,28 @@ export default function ReaderNavbar({
                 class="p-[0.5px] text-secondary dark:text-secondary-foreground stroke-[1.5]"
               />
             </Show>
+          </NavbarListItem>
+
+					<div class=""/>
+
+          <NavbarListItem
+            onClick={() => { setZoomLevel(prev => prev - 0.03); console.log(zoomLevel()) }}
+          >
+            <IconZoomOut
+              class="py-[1px]
+								text-secondary dark:text-secondary-foreground 
+								stroke-[1.5]"
+            />
+          </NavbarListItem>
+
+          <NavbarListItem
+            onClick={() => { setZoomLevel(prev => prev + 0.03); console.log(zoomLevel()) }}
+          >
+            <IconZoomIn
+              class="py-[1px]
+								text-secondary dark:text-secondary-foreground 
+								stroke-[1.5]"
+            />
           </NavbarListItem>
         </div>
         <div class="w-fit flex flex-row h-full">

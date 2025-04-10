@@ -393,7 +393,7 @@ pub fn read_os_folder_dir(
     let is_manga_folder = !current_folders_panels.is_empty();
     total_panels.extend(current_folders_panels);
 
-    total_panels.par_sort_by(SortType::sort(&SortType::EpisodeTitleRegex));
+    total_panels.par_sort_by(SortType::sort(SortType::EpisodeTitleRegex));
 
     let first_panel = total_panels.first().cloned();
     //println!("first_panel: {:?}", first_panel); // Debug statement

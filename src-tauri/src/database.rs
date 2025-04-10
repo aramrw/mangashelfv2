@@ -22,7 +22,7 @@ use crate::{
 
 pub static EPISODE_TITLE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     regex::Regex::new(
-        r"(?i)(?:S\d{1,2}E|第|EP?|Episode|Ch|Chapter|Vol|Volume|#)?\s*(\d{1,3})(?:話|巻|章|節|[._\-\s]|$)",
+        r"(?i)(?:S\d{1,2}E|第|EP?|Episode|Ch|Chapter|Vol|Volume|#)?\s*(\d+)(?:話|巻|章|節|[._\-\s]|$)",
     )
     .unwrap()
 });
@@ -390,7 +390,7 @@ pub fn init_database(app_data_dir: &Path, handle: &AppHandle) -> Result<(), db_t
 // sort type
 
 #[non_exhaustive]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum SortType {
     None,
     EpisodeTitleRegex,
@@ -398,7 +398,7 @@ pub enum SortType {
 }
 
 impl SortType {
-    pub fn sort<T>(&self) -> impl Fn(&T, &T) -> std::cmp::Ordering
+    pub fn sort<T>(self) -> impl Fn(&T, &T) -> std::cmp::Ordering
     where
         T: HasDatetime + HasTitle,
     {
@@ -609,7 +609,7 @@ pub fn get_panels(
         )));
     }
 
-    panels.par_sort_by(SortType::sort(&SortType::EpisodeTitleRegex));
+    panels.par_sort_by(SortType::sort(SortType::EpisodeTitleRegex));
 
     //println!("{:#?}", folders);
 
@@ -757,7 +757,7 @@ pub fn get_prev_folder(
         )));
     }
 
-    folders.par_sort_by(SortType::sort(&SortType::EpisodeTitleRegex));
+    folders.par_sort_by(SortType::sort(SortType::EpisodeTitleRegex));
 
     match folders
         .into_iter()
@@ -794,7 +794,7 @@ pub fn get_next_folder(
         )));
     }
 
-    folders.par_sort_by(SortType::sort(&SortType::EpisodeTitleRegex));
+    folders.par_sort_by(SortType::sort(SortType::EpisodeTitleRegex));
 
     match folders
         .into_iter()
