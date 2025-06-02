@@ -48,9 +48,9 @@ const LibraryFolderCard = ({
           <div
             class={cn(
               `w-full h-48 lg:h-56 min-h-30 cursor-pointer relative border-[1.6px]
-						border-transparent rounded-sm shadow-md
+						border-black rounded-sm shadow-md
 						flex items-center justify-center overflow-hidden
-						will-change-auto transition-all group`,
+						will-change-auto transition-all group transform-gpu`,
             )}
             onClick={onClick}
           >

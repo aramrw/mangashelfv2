@@ -5,6 +5,8 @@ import { useNavigate } from "@solidjs/router";
 import { IconBookFilled } from "@tabler/icons-solidjs";
 import { cn } from "../../libs/cn";
 import { MangaPanelDescription } from "../../main-components/description/panel-desc";
+import IconAnilist from "../../main-components/icons/icon-anilist";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "../../components/ui/hover-card";
 
 export function escapeCSSUrl(url: string) {
   return url.replace(/\(/g, "\\(").replace(/\)/g, "\\)");
@@ -83,6 +85,13 @@ export default function ({
         >
           {mainParentFolder()?.update_time}
         </h3>
+        <HoverCard>
+          <HoverCardTrigger>
+            <IconAnilist />
+          </HoverCardTrigger>
+          <HoverCardContent class="text-xs">
+          </HoverCardContent>
+        </HoverCard>
       </div>
       <Show when={mainParentFolder()?.title && mainParentFolder()?.cover_img_path}>
         <div
